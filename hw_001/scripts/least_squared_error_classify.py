@@ -7,7 +7,15 @@ import os
 Python Program demonstrating the use of a LSE (Least Squared Error) classifier.
 '''
 
-
+def ParseData(raw_data):
+    raw_data_list = raw_data.split('\n')
+    data_list = list()
+    for raw_data_point in raw_data_list:
+        point = raw_data_point.split(' ')
+        point.pop()
+        data_list.append([float(x) for x in point])
+    data_list.pop()
+    return np.array(data_list)
 
 
 def main():
@@ -20,7 +28,7 @@ def main():
     args = parser.parse_args()
 
     # Check if Arguments allow execution
-    if not args.training_file or not args.read_model:
+    if (not args.training_file) and (not args.read_model):
         print "Error: No training Data or model present!"
         return -1
 
@@ -37,7 +45,13 @@ def main():
         with open(args.training_file) as file:
             # read file contents
             raw_data = file.read()
-            print raw_data
+            # parse data
+        data = ParseData(raw_data)
+
+        # train on data
+        
+            
+
 
 if __name__ == '__main__':
     main()
