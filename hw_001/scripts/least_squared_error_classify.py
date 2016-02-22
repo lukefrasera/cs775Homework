@@ -7,6 +7,7 @@ import os
 import pdb
 from scipy import spatial
 import time
+import operator
 '''
 Python Program demonstrating the use of a LSE (Least Squared Error) classifier.
 '''
@@ -44,13 +45,24 @@ def KNNClassify(train_classification, test_neighbors):
     for sample in test_neighbors[1]:
         votes = [0 for x in xrange(10)]
         for neighbor in sample:
-            sample_class = train_classification(neighbor)
+            sample_class = int(train_classification[neighbor])
             votes[sample_class] += 1
         classification = max(enumerate(votes), key=operator.itemgetter(1))[0]
         test_classification.append(classification)
     return test_classification
 
-def ParseData(raw_data):
+def LSESearch(features,classification, test_data):
+     features = np.matrix(features)
+     classification = np.matrix(classification).T
+     test_data = np.matrix(test_data)
+     filter = la.inv(features.T * features)  * features.T * classification
+     test_data_classification = []
+     classification = (test_data * filter)
+     classification[classification < 0] = -1
+     classification[classification >=0] = 1
+     return classification
+
+def ParseData(raw_data, class1, class2):
     raw_data = raw_data.rstrip('\n')
     raw_data_list = raw_data.split('\n')
     data_list = list()
@@ -59,8 +71,10 @@ def ParseData(raw_data):
         point = raw_data_point.split(' ')
         data_list.append([float(x) for x in point])
     data_list.pop()
-    return np.array(data_list)
-
+    data_list_np = np.array(data_list)
+    mask = (data_list_np[:,0] == class1) + (data_list_np[:,0] == class2)
+    data_list_np = data_list_np[mask]
+    return data_list_np
 
 def main():
 
@@ -70,6 +84,10 @@ def main():
     parser.add_argument('-s', '--save_model', type=str, help='save out trained model')
     parser.add_argument('-r', '--read_model', type=str, help='read in trained model')
     parser.add_argument('-k', '--k_neighbors', type=int, help='number of neighbors to find')
+    parser.add_argument('-a', '--classa', type=int, help='class to test/train on')
+    parser.add_argument('-b', '--classb', type=int, help='class to test/train on')
+    parser.add_argument('-m', '--method', type=int, help='0=KNN,1=LSE')
+
     args = parser.parse_args()
 
     # Check if Arguments allow execution
@@ -91,19 +109,44 @@ def main():
             # read file contents
             raw_data = file.read()
             # parse data
-        data = ParseData(raw_data)
+        data = ParseData(raw_data, args.classa, args.classb)
         # train on data
         classification = data[:,0]
         features = np.matrix(data[:,1:])
     if args.testing_file:
         with open(args.testing_file) as test_file:
             raw_test_data = test_file.read()
-            test_data = ParseData(raw_test_data)
+            test_data = ParseData(raw_test_data, args.classa, args.classb)
             test_data_truth = test_data[:,0]
             test_data = np.matrix(test_data[:,1:])
+    if args.method == 0:
         nearest_neighbors = KNNSearchFast(args.k_neighbors, features, test_data)
-        print nearest_neighbors
-        KNNClassify(classification, nearest_neighbors)
+        print "Num training samples: %d, num test samples: %d" % (len(classification), len(test_data_truth))
+        classification = KNNClassify(classification, nearest_neighbors)
+        errors = test_data_truth - classification
+        misclassification_a = errors[errors == args.classa - args.classb]
+        misclassification_b = errors[errors == args.classb - args.classa]
+        mask = errors != 0
+        num_errors = sum(mask)
+        print "Error rate: %f%%" % (float(num_errors)/len(test_data_truth)*100)
+        print "Percentage of %d's misclassified: %f" % (args.classa, float(misclassification_a.size)/test_data_truth[test_data_truth == args.classa].size*100)
+        print "Percentage of %d's misclassified: %f" % (args.classb, float(misclassification_b.size)/test_data_truth[test_data_truth ==  args.classb].size*100)
+    if args.method == 1:
+        #make classification binary
+        classification[classification == args.classa] = -1
+        classification[classification == args.classb] = 1
 
+        test_data_classification = LSESearch(features, classification, test_data)
+        test_data_truth[test_data_truth == args.classa] = -1
+        test_data_truth[test_data_truth == args.classb] = 1
+
+        errors = test_data_classification.T - np.matrix(test_data_truth)
+        misclassification_a = errors[errors == 2]
+        misclassification_b = errors[errors == -2]
+        num_errors = np.sum(np.absolute(errors))
+        print "Num training samples: %d, num test samples: %d" % (len(classification), len(test_data_truth))
+        print "Error rate: %f%%" % (float(num_errors)/len(test_data_truth)*100)
+        print "Percentage of %d's misclassified: %f" % (args.classa, float(misclassification_a.size)/test_data_truth[test_data_truth == -1].size*100)
+        print "Percentage of %d's misclassified: %f" % (args.classb, float(misclassification_b.size)/test_data_truth[test_data_truth ==  1].size*100)
 if __name__ == '__main__':
     main()
