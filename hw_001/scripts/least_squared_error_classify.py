@@ -9,7 +9,7 @@ from scipy import spatial
 import time
 import operator
 '''
-Python Program demonstrating the use of a LSE (Least Squared Error) classifier.
+Python Program demonstrating the use of a LSE (Least Squared Error) and KNN (K Nearest Neighbors) classifier.
 '''
 
 #KNNCLassifier returns a tuple of the K closest feature vectors
@@ -125,26 +125,33 @@ def main():
             test_data_truth = test_data[:,0]
             test_data = np.matrix(test_data[:,1:])
     if args.method == 0:
+				#Do KNN classification
         nearest_neighbors = KNNSearchFast(args.k_neighbors, features, test_data)
         print "Num training samples: %d, num test samples: %d" % (len(classification), len(test_data_truth))
         classification = KNNClassify(classification, nearest_neighbors)
+
+				#Compute the error rate
         errors = test_data_truth - classification
         misclassification_a = errors[errors == args.classa - args.classb]
         misclassification_b = errors[errors == args.classb - args.classa]
         mask = errors != 0
         num_errors = sum(mask)
         print "Error rate: %f%%" % (float(num_errors)/len(test_data_truth)*100)
-        print "Percentage of %d's misclassified: %f" % (args.classa, float(misclassification_a.size)/test_data_truth[test_data_truth == args.classa].size*100)
+        print "Percentage of %d's misclassified: %f" % (args.classa, 
+														float(misclassification_a.size)/test_data_truth[test_data_truth == args.classa].size*100)
         print "Percentage of %d's misclassified: %f" % (args.classb, float(misclassification_b.size)/test_data_truth[test_data_truth ==  args.classb].size*100)
     if args.method == 1:
+				#Do LSE classification
         #make classification binary
         classification[classification == args.classa] = -1
         classification[classification == args.classb] = 1
 
+				#Perform the classficiation on the test data
         test_data_classification = LSESearch(features, classification, test_data)
         test_data_truth[test_data_truth == args.classa] = -1
         test_data_truth[test_data_truth == args.classb] = 1
 
+				#Compute the error rate
         errors = test_data_classification.T - np.matrix(test_data_truth)
         misclassification_a = errors[errors == 2]
         misclassification_b = errors[errors == -2]
