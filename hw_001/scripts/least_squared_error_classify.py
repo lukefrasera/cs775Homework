@@ -44,9 +44,14 @@ def KNNClassify(train_classification, test_neighbors):
     test_classification = []
     for sample in test_neighbors[1]:
         votes = [0 for x in xrange(10)]
-        for neighbor in sample:
-            sample_class = int(train_classification[neighbor])
-            votes[sample_class] += 1
+        try:
+            for neighbor in sample:
+                sample_class = int(train_classification[neighbor])
+                votes[sample_class] += 1
+        except TypeError:
+            #catch the case where K=1
+            sample_class = int(train_classification[sample])
+            votes[sample_class] = 1
         classification = max(enumerate(votes), key=operator.itemgetter(1))[0]
         test_classification.append(classification)
     return test_classification
