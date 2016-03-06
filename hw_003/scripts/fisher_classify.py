@@ -23,8 +23,36 @@ def ParseData(raw_data, class1, class2):
     data_list_np = data_list_np[mask]
     return data_list_np
 
-def main():
+def FisherClassifier(features, classification, test_data, classa, classb):
+    '''
+    :param features:
+    :param classification:
+    :param test_data:
+    :return:
+    '''
+    # separate classes
+    class_a_features = features[classification == classa]
+    class_b_features = features[classification == classb]
 
+    class_a_mean = np.mean(class_a_features, 0).T
+    class_a_cov  = np.cov(class_a_features.T)
+
+    class_b_mean = np.mean(class_b_features, 0).T
+    class_b_cov  = np.cov(class_b_features.T)
+
+    # compute the Fisher criteria projection to one dimension
+    project_a = la.inv(class_a_cov + class_b_cov) * (class_a_mean - class_b_mean)
+    project_a = project_a / la.norm(project_a)
+
+    # project all of the data
+    class_a_project = class_a_features * project_a
+    class_b_project = class_b_features * project_a
+
+
+
+
+
+def main():
     parser = argparse.ArgumentParser(description='Process input')
     parser.add_argument('-t', '--training_file', type=str, help='submit data to train against')
     parser.add_argument('-f', '--testing_file', type=str, help='submit data to test the trained model against')
@@ -36,7 +64,7 @@ def main():
     parser.add_argument('-m', '--method', type=int, help='0=KNN,1=LSE')
 
     args = parser.parse_args()
-
+    print os.getcwd()
     # Check if Arguments allow execution
     if (not args.training_file) and (not args.read_model):
         print "Error: No training Data or model present!"
@@ -70,4 +98,7 @@ def main():
             test_data = np.matrix(test_data[:,1:])
 
     if args.method == 0:
-        print "good to go"
+        FisherClassifier(features, classification, test_data, args.classa, args.classb)
+
+if __name__ == '__main__':
+    main()
