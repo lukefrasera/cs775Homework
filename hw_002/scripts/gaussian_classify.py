@@ -9,7 +9,7 @@ from scipy import spatial
 import time
 import operator
 '''
-Python Program demonstrating the use of a LSE (Least Squared Error) and KNN (K Nearest Neighbors) classifier.
+Python Program demonstrating the use of a gaussian classifier.
 '''
 
 #KNNCLassifier returns a tuple of the K closest feature vectors
@@ -57,7 +57,6 @@ def KNNClassify(train_classification, test_neighbors):
     return test_classification
 
 def LSESearch(features,classification, test_data):
-     t0 = time.time()
      features = np.matrix(features)
      classification = np.matrix(classification).T
      test_data = np.matrix(test_data)
@@ -66,8 +65,6 @@ def LSESearch(features,classification, test_data):
      classification = (test_data * filter)
      classification[classification < 0] = -1
      classification[classification >=0] = 1
-     t1 = time.time()
-     print "Took %f seconds to classify" % (t1-t0)
      return classification
 
 def ParseData(raw_data, class1, class2):
@@ -84,6 +81,46 @@ def ParseData(raw_data, class1, class2):
     data_list_np = data_list_np[mask]
     return data_list_np
 
+def GaussianBuild(features, classification, classa, classb):
+    pdb.set_trace()
+    classaFeaturesMask = (classification == classa)
+    classbFeaturesMask = (classification == classb)
+    aFeatures = np.array(features)[classaFeaturesMask].T
+    bFeatures = np.array(features)[classbFeaturesMask].T
+    print 'Of ',features.shape,'Elements, ',aFeatures.shape,' are of class A, ',bFeatures.shape,' are of class B'
+    aCovMat = np.cov(aFeatures)
+    aMeanMat = np.mean(aFeatures,1)
+    bCovMat = np.cov(bFeatures)
+    bMeanMat = np.mean(bFeatures,1)
+    return [aCovMat,aMeanMat,bCovMat,bMeanMat]
+
+def ComputeGaussianProbability(covMat, meanMat, sample):
+   meanMat = np.matrix(meanMat).T
+   sample = sample.T
+   #sample = meanMat
+   nonInvertible = True
+   eyeScale = 0.0
+   while nonInvertible:
+        nonInvertible = False
+        try:
+   	    covMatInverse = la.inv(covMat + np.eye(covMat.shape[0])*eyeScale)
+        except la.linalg.LinAlgError:
+           nonInvertible = True
+        eyeScale = eyeScale + 0.0001
+   if eyeScale > 0.002:
+   	print 'Set lambda to ',eyeScale,' to make covMat invertible'
+   probability = 1.0/(np.sqrt(la.norm(2*np.pi*covMat)))
+   probability *= np.exp(-0.5*(sample-meanMat).T*covMatInverse*(sample-meanMat))
+   return probability
+
+def GaussianClassify(aCovMat, aMeanMat, bCovMat, bMeanMat, test_data):
+    #for each sample, compute the probability of it belonging to each class
+    for sample in test_data:
+       #pdb.set_trace()
+       probability_a = ComputeGaussianProbability(aCovMat, aMeanMat, sample) 
+       probability_b = ComputeGaussianProbability(bCovMat, bMeanMat, sample)
+       print 'Sample P(A)=',probability_a,'Sample P(B)=',probability_b
+
 def main():
 
     parser = argparse.ArgumentParser(description='Process input')
@@ -94,7 +131,7 @@ def main():
     parser.add_argument('-k', '--k_neighbors', type=int, help='number of neighbors to find')
     parser.add_argument('-a', '--classa', type=int, help='class to test/train on')
     parser.add_argument('-b', '--classb', type=int, help='class to test/train on')
-    parser.add_argument('-m', '--method', type=int, help='0=KNN,1=LSE')
+    parser.add_argument('-m', '--method', type=int, help='0=KNN,1=LSE,2=Gauss')
 
     args = parser.parse_args()
 
@@ -118,8 +155,6 @@ def main():
             raw_data = file.read()
             # parse data
         data = ParseData(raw_data, args.classa, args.classb)
-        #plt.imshow(data[0,1:].reshape(1,256), cmap = plt.cm.Greys, interpolation = 'nearest')
-        #plt.show()
         # train on data
         classification = data[:,0]
         features = np.matrix(data[:,1:])
@@ -165,5 +200,9 @@ def main():
         print "Error rate: %f%%" % (float(num_errors)/len(test_data_truth)*100)
         print "Percentage of %d's misclassified: %f" % (args.classa, float(misclassification_a.size)/test_data_truth[test_data_truth == -1].size*100)
         print "Percentage of %d's misclassified: %f" % (args.classb, float(misclassification_b.size)/test_data_truth[test_data_truth ==  1].size*100)
+    if args.method == 2:
+        #build the gaussian model
+        [aCovMat, aMeanMat, bCovMat, bMeanMat] = GaussianBuild(features, classification, args.classa, args.classb)
+        GaussianClassify(aCovMat, aMeanMat, bCovMat, bMeanMat, features)
 if __name__ == '__main__':
     main()
