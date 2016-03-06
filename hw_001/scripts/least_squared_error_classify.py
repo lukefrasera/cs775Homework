@@ -52,6 +52,7 @@ def KNNClassify(train_classification, test_neighbors):
     return test_classification
 
 def LSESearch(features,classification, test_data):
+     t0 = time.time()
      features = np.matrix(features)
      classification = np.matrix(classification).T
      test_data = np.matrix(test_data)
@@ -60,6 +61,8 @@ def LSESearch(features,classification, test_data):
      classification = (test_data * filter)
      classification[classification < 0] = -1
      classification[classification >=0] = 1
+     t1 = time.time()
+     print "Took %f seconds to classify" % (t1-t0)
      return classification
 
 def ParseData(raw_data, class1, class2):
@@ -110,6 +113,8 @@ def main():
             raw_data = file.read()
             # parse data
         data = ParseData(raw_data, args.classa, args.classb)
+        #plt.imshow(data[0,1:].reshape(1,256), cmap = plt.cm.Greys, interpolation = 'nearest')
+        #plt.show()
         # train on data
         classification = data[:,0]
         features = np.matrix(data[:,1:])
