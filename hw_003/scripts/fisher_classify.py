@@ -49,7 +49,23 @@ def FisherClassifier(features, classification, test_data, classa, classb):
     class_a_project = class_a_features * project_a
     class_b_project = class_b_features * project_a
 
-def GaussianBuild(features, classification, class_id):
+    class_a_gauss_build = GaussianBuild(class_a_project)
+    class_b_gauss_build = GaussianBuild(class_b_project)
+
+    # class_a_prob = []
+    # class_b_prob = []
+    classification_result = []
+    for sample in test_data:
+        sample_project = sample * project_a
+        class_a_prob = ComputeGaussianProbability(class_a_gauss_build[0], class_a_gauss_build[1], sample_project)
+        class_b_prob = ComputeGaussianProbability(class_b_gauss_build[0], class_b_gauss_build[1], sample_project)
+        if class_a_prob > class_b_prob:
+            classification_result.append(classa)
+        else:
+            classification_result.append(classb)
+    return classification_result
+
+def GaussianBuild(features):
     """
     computes the mean and covariance for a dataset
     :param features: s x f np.matrix (s samples by f features)
@@ -57,12 +73,10 @@ def GaussianBuild(features, classification, class_id):
     :param class_id: scalar value to find
     :return: [covariance(f x f),mean (f x 1)]
     """
-    pdb.set_trace()
-    features_mask = (classification == class_id)
-    class_features = np.array(features)[features_mask].T
-    print 'Of ', features.shape, 'Elements, ', class_features.shape, ' are of class', class_id
-    cov_mat = np.cov(class_features)
-    mean_mat = np.mean(class_features, 1)
+    #pdb.set_trace()
+    print 'Of ', features.shape, 'Elements, ', features.shape
+    cov_mat = np.cov(features.T)
+    mean_mat = np.mean(features.T)
     return [cov_mat, mean_mat]
 
 
@@ -79,16 +93,7 @@ def ComputeGaussianProbability(cov_mat, mean_mat, sample):
     # sample = meanMat
     non_invertible = True
     eye_scale = 0.0
-    cov_mat_inverse = 0
-    while non_invertible:
-        non_invertible = False
-        try:
-            cov_mat_inverse = la.inv(cov_mat + np.eye(cov_mat.shape[0]) * eye_scale)
-        except la.linalg.LinAlgError:
-            nonInvertible = True
-        eye_scale += 0.000000001
-    if eye_scale > 0.002:
-        print 'Set lambda to ', eye_scale, ' to make covMat invertible'
+    cov_mat_inverse = 1.0 / cov_mat
     probability = 1.0 / (np.sqrt(la.norm(2 * np.pi * cov_mat)))
     probability *= np.exp(-0.5 * (sample - mean_mat).T * cov_mat_inverse * (sample - mean_mat))
     return probability
@@ -139,7 +144,21 @@ def main():
             test_data = np.matrix(test_data[:, 1:])
 
     if args.method == 0:
-        FisherClassifier(features, classification, test_data, args.classa, args.classb)
+        result = FisherClassifier(features, classification, test_data, args.classa, args.classb)
+        print result
+        print [int(x) for x in list(test_data_truth)]
+        errors = np.array(result) == test_data_truth
+        class_a_samples = errors[test_data_truth == args.classa]
+        class_b_samples = errors[test_data_truth == args.classb]
+        num_a_correct = np.sum(class_a_samples)
+        num_b_correct = np.sum(class_b_samples)
+        total_a = class_a_samples.shape[0]
+        total_b = class_b_samples.shape[0]
+        print (1.0-float(num_a_correct)/total_a)*100,'%% of class a was misclassified'
+        print (1.0-float(num_b_correct)/total_b)*100,'%% of class b was misclassified'
+
+
 
 if __name__ == '__main__':
     main()
+
