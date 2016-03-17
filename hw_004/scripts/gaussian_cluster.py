@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import numpy as np
+from math import floor
 from numpy import linalg as la
+from numpy import matlib as matlib
 import matplotlib.pyplot as plt
 import argparse
 import os
@@ -8,9 +10,10 @@ import pdb
 from scipy import spatial
 import time
 import operator
+import random
 
 
-def ParseData(raw_data, class1, class2):
+def ParseData(raw_data):
     raw_data = raw_data.rstrip('\n')
     raw_data_list = raw_data.split('\n')
     data_list = list()
@@ -20,70 +23,52 @@ def ParseData(raw_data, class1, class2):
         data_list.append([float(x) for x in point])
     data_list.pop()
     data_list_np = np.array(data_list)
-    mask = (data_list_np[:, 0] == class1) + (data_list_np[:, 0] == class2)
-    data_list_np = data_list_np[mask]
     return data_list_np
 
-def ComputeMahalanobisDistance(sample, mean, covariance):
-    return np.sqrt(
+def ComputeMahalanobisDistance(sample, covariance):
+    invertible = False
+    lambda_scale = 10e-10
+    while not invertible:
+        try:
+            right = la.inv(covariance + np.eye(covariance.shape[0])*lambda_scale)*sample.T
+        except la.LinAlgError:
+            lambda_scale += 10e-10
+            continue
+        invertible = True
+    left = np.multiply(sample.T,right)
+    distance = np.sqrt(np.sum(left,0))
+    return distance
 
 def GaussianCluster(train_data, test_data, iterations, num_clusters):
-    '''
-    :param features:
-    :param classification:
-    :param test_data:
-    :return:
-    '''
     #general algorithm: use the elements in features to construct the class separations
     #then test the separations on the test data
 
     #first, select random means for each cluster
-    num_features = train_data.shape(1)
-    num_train_samples = train_data.shape(2)
+    num_features = train_data.shape[1]
+    num_train_samples = train_data.shape[0]
     means = np.zeros((num_clusters,num_features))
-    covariance = np.zeros((num_train_samples, num_features, num_features));
+    covariance = np.zeros((num_clusters, num_features, num_features))
+    labels = np.zeros(num_train_samples)
     for cluster in range(num_clusters):
-        sample_index = random.random() * num_train_samples
-        means(cluster) = train_data(sample_index)
-        covariance(cluster) = np.eye(num_features)
+        sample_index = floor(random.random() * num_train_samples)
+        means[cluster] = train_data[sample_index]
+        covariance[cluster] = np.eye(num_features)
+    #Now for each iteration, check find the closest cluster and assign the data point to that cluster
+    sample_mdistances = np.zeros([num_clusters,num_train_samples])
     for iteration in range(iterations):
         #assign all the data to a class
-        for sample in train_data:
-		distance = 
-            
-
-def GaussianBuild(features):
-    """
-    computes the mean and covariance for a dataset
-    :param features: s x f np.matrix (s samples by f features)
-    :param classification: s x 1 np.ndarray
-    :param class_id: scalar value to find
-    :return: [covariance(f x f),mean (f x 1)]
-    """
-    #pdb.set_trace()
-    print 'Of ', features.shape, 'Elements, ', features.shape
-    cov_mat = np.cov(features.T)
-    mean_mat = np.mean(features.T)
-    return [cov_mat, mean_mat]
-
-
-def ComputeGaussianProbability(cov_mat, mean_mat, sample):
-    """
-    computes the probability of a particular sample belonging to a particular gaussian distribution
-    :param cov_mat: f x f np.matrix (f features)
-    :param mean_mat: f x 1 np.matrix
-    :param sample: f x 1 np.matrix
-    :return:
-    """
-    mean_mat = np.matrix(mean_mat).T
-    sample = sample.T
-    # sample = meanMat
-    non_invertible = True
-    eye_scale = 0.0
-    cov_mat_inverse = 1.0 / cov_mat
-    probability = 1.0 / (np.sqrt(la.norm(2 * np.pi * cov_mat)))
-    probability *= np.exp(-0.5 * (sample - mean_mat).T * cov_mat_inverse * (sample - mean_mat))
-    return probability
+        for cluster_index in range(num_clusters):
+            sample_distance = np.subtract(train_data,means[cluster_index])
+            sample_mdistances[cluster_index] = ComputeMahalanobisDistance(sample_distance,covariance[cluster_index])
+        #assign a label to each sample
+        labels = np.argmin(sample_mdistances,0)
+        #recompute the mean and covariance of each cluster
+        for cluster_index in range(num_clusters):
+            mask = labels == cluster_index
+            this_cluster = train_data[mask,:]
+            means[cluster_index] = np.mean(this_cluster,0)
+            covariance[cluster_index,:,:] = np.cov(this_cluster.T)
+    return [labels,means,covariance]
 
 def main():
     parser = argparse.ArgumentParser(description='Process input')
@@ -91,10 +76,9 @@ def main():
     parser.add_argument('-f', '--testing_file', type=str, help='submit data to test the trained model against')
     parser.add_argument('-s', '--save_model', type=str, help='save out trained model')
     parser.add_argument('-r', '--read_model', type=str, help='read in trained model')
-    parser.add_argument('-k', '--k_neighbors', type=int, help='number of neighbors to find')
-    parser.add_argument('-a', '--classa', type=int, help='class to test/train on')
-    parser.add_argument('-b', '--classb', type=int, help='class to test/train on')
     parser.add_argument('-m', '--method', type=int, help='0=GaussCluster')
+    parser.add_argument('-c', '--clusters', type=int, help='num clusters')
+    parser.add_argument('-i', '--iters', type=int, help='iterations to run')
 
     args = parser.parse_args()
     print os.getcwd()
@@ -117,7 +101,7 @@ def main():
             # read file contents
             raw_data = file.read()
             # parse data
-        data = ParseData(raw_data, args.classa, args.classb)
+        data = ParseData(raw_data)
         # plt.imshow(data[0,1:].reshape(1,256), cmap = plt.cm.Greys, interpolation = 'nearest')
         # plt.show()
         # train on data
@@ -126,26 +110,41 @@ def main():
     if args.testing_file:
         with open(args.testing_file) as test_file:
             raw_test_data = test_file.read()
-            test_data = ParseData(raw_test_data, args.classa, args.classb)
+            test_data = ParseData(raw_test_data)
             test_data_truth = test_data[:, 0]
             test_data = np.matrix(test_data[:, 1:])
 
     if args.method == 0:
-        result = FisherClassifier(features, classification, test_data, args.classa, args.classb)
-        print result
-        print [int(x) for x in list(test_data_truth)]
-        errors = np.array(result) == test_data_truth
-        class_a_samples = errors[test_data_truth == args.classa]
-        class_b_samples = errors[test_data_truth == args.classb]
-        num_a_correct = np.sum(class_a_samples)
-        num_b_correct = np.sum(class_b_samples)
-        total_a = class_a_samples.shape[0]
-        total_b = class_b_samples.shape[0]
-        print (1.0-float(num_a_correct)/total_a)*100,'%% of class a was misclassified'
-        print (1.0-float(num_b_correct)/total_b)*100,'%% of class b was misclassified'
+        beginTime = time.clock()
+        [train_labels,means,covariance] = GaussianCluster(features, test_data, args.iters, args.clusters)
+        endTime = time.clock()
+        print "Time elapsed "+str(endTime-beginTime)
 
 
+        #Run the clustering algorithm on the test data set
+        num_test_samples = test_data.shape[0]
+        sample_mdistances = np.zeros([args.clusters,num_test_samples])
+        for cluster_index in range(args.clusters):
+            sample_distance = np.subtract(test_data,means[cluster_index])
+            sample_mdistances[cluster_index] = ComputeMahalanobisDistance(sample_distance,covariance[cluster_index])
+        #assign a label to each sample
+        test_labels = np.argmin(sample_mdistances,0)
 
+        #now compute the composition of each cluster
+        histogram_database = np.zeros((args.clusters,args.clusters))
+        for cluster_index in range(args.clusters):
+            mask = test_labels == cluster_index
+            this_cluster = test_data_truth[mask]
+            histogram = np.histogram(this_cluster,bins=range(args.clusters+1))[0]
+            histogram_database[cluster_index] = histogram
+        total_samples = np.sum(histogram_database,0)
+        temp = [["%6d" % j for j in list(i)] for i in list(histogram_database)]
+        for item in temp:
+            print item
+        normalized_histogram = np.divide(histogram_database,matlib.repmat(total_samples,args.clusters,1))
+        normalized_histogram = [["%6.2f" % j for j in list(i)] for i in list(normalized_histogram)]
+        for hist in normalized_histogram:
+            print hist
 if __name__ == '__main__':
     main()
 
