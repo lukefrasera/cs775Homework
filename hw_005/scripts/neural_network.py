@@ -52,10 +52,17 @@ class Sigmoid:
 
 class NeuralNetwork:
     def __init__(self, feature_size, compute_components, output_size):
-        self.o_zero = np.matrix(np.zeros((1, feature_size)))
-        self.W_one = np.matrix(np.random.rand(feature_size, compute_components))
-        self.o_one = np.matrix(np.zeros((1, compute_components)))
-        self.W_two = np.matrix(np.random.rand(compute_components, output_size))
+        self.o_zero     = np.matrix(np.zeros((1, feature_size)))
+        self.o_zero_bar = np.matrix(np.zeros((1, feature_size + 1)))
+
+        self.W_one      = np.matrix(np.random.rand(feature_size, compute_components))
+        self.W_one_bar  = np.matrix(np.random.rand(feature_size + 1, compute_components))
+
+        self.o_one      = np.matrix(np.zeros((1, compute_components)))
+        self.o_one_bar  = np.matrix(np.zeros((1, compute_components + 1)))
+
+        self.W_two      = np.matrix(np.random.rand(compute_components, output_size))
+        self.W_two_bar  = np.matrix(np.random.rand(compute_components + 1, output_size))
         self.S = Sigmoid()
 
     def FeedForward(self, feature, truth):
