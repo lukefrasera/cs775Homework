@@ -2,6 +2,7 @@
 import csv, sys
 from sympy import *
 import numpy as np
+from numpy import linalg as ln
 import numexpr as ne
 import pdb
 
@@ -78,7 +79,8 @@ class NeuralNetwork:
       self.o_one_bar[0, :-1] = self.o_one
       self.o_two = self.S.Sigmoid(self.o_one_bar * self.W_two_bar)
 
-      print self.o_two
+      self.error = 1.0 / 2.0 * ln.norm(truth - self.o_two)**2.0
+      print self.error
 
     def BackProp(self):
       pass
