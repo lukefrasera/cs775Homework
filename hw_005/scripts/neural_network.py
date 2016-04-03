@@ -52,26 +52,33 @@ class Sigmoid:
 
 class NeuralNetwork:
     def __init__(self, feature_size, compute_components, output_size):
-        self.o_zero     = np.matrix(np.zeros((1, feature_size)))
-        self.o_zero_bar = np.matrix(np.zeros((1, feature_size + 1)))
+        self.o_zero     = np.matrix(np.ones((1, feature_size)))
+        self.o_zero_bar = np.matrix(np.ones((1, feature_size + 1)))
 
         self.W_one      = np.matrix(np.random.rand(feature_size, compute_components))
         self.W_one_bar  = np.matrix(np.random.rand(feature_size + 1, compute_components))
 
-        self.o_one      = np.matrix(np.zeros((1, compute_components)))
-        self.o_one_bar  = np.matrix(np.zeros((1, compute_components + 1)))
+        self.o_one      = np.matrix(np.ones((1, compute_components)))
+        self.o_one_bar  = np.matrix(np.ones((1, compute_components + 1)))
 
         self.W_two      = np.matrix(np.random.rand(compute_components, output_size))
         self.W_two_bar  = np.matrix(np.random.rand(compute_components + 1, output_size))
+
+        self.o_two      = np.matrix(np.ones((1, output_size)))
         self.S = Sigmoid()
 
     def FeedForward(self, feature, truth):
       # Compute the Feed forward pass of an iteration on the Neural Network
       # Need to append one onto the end of each of the weight and feature vector
       # pdb.set_trace()
-      self.o_zero = np.matrix(feature)
-      self.o_one = self.S.Sigmoid(self.o_zero * self.W_one)
-      print self.o_one
+      # pdb.set_trace()
+      self.o_zero_bar[0, :-1] = np.matrix(feature)
+      self.o_one = self.S.Sigmoid(self.o_zero_bar * self.W_one_bar)
+      
+      self.o_one_bar[0, :-1] = self.o_one
+      self.o_two = self.S.Sigmoid(self.o_one_bar * self.W_two_bar)
+
+      print self.o_two
 
     def BackProp(self):
       pass
