@@ -3,6 +3,7 @@ import csv, sys
 from sympy import *
 import numpy as np
 import numexpr as ne
+import pdb
 
 
 class CSVInput:
@@ -33,16 +34,16 @@ class CSVInput:
                                       value = 1
                             row_list.append(value)
                     self.data.append(row_list)
+        self.rows = len(self.data)
+        self.cols = len(self.data[0])
 
 
 class Sigmoid:
     def __init__(self):
         t = symbols('t')
-
         self.sigmoid = 1 / (1 + exp(-t))
         self.sigmoid_dif = self.sigmoid * (1 - self.sigmoid)
-        # print self.sigmoid
-        # print self.sigmoid_dif
+
     def Sigmoid(self, t):
         return ne.evaluate(str(self.sigmoid))
     
@@ -51,19 +52,24 @@ class Sigmoid:
 
 class NeuralNetwork:
     def __init__(self, feature_size, compute_components, output_size):
-        self.o_zero = np.zeros(feature_size, 1)
-        self.W_one = np.random(feature_size, compute_components)
-        self.o_one = np.zeros(compute_components, 1)
-        self.W_two = np.random(compute_components, output_size)
+        self.o_zero = np.matrix(np.zeros((1, feature_size)))
+        self.W_one = np.matrix(np.random.rand(feature_size, compute_components))
+        self.o_one = np.matrix(np.zeros((1, compute_components)))
+        self.W_two = np.matrix(np.random.rand(compute_components, output_size))
         self.S = Sigmoid()
 
     def FeedForward(self, feature, truth):
-      # Compute the Feed forward pass of the first iteration on the Neural Network
+      # Compute the Feed forward pass of an iteration on the Neural Network
       # Need to append one onto the end of each of the weight and feature vector
+      # pdb.set_trace()
       self.o_zero = np.matrix(feature)
-      self.o_one = self.S(self.o_zero * self.W_one)
+      self.o_one = self.S.Sigmoid(self.o_zero * self.W_one)
+      print self.o_one
 
     def BackProp(self):
+      pass
+
+    def UpdateWeights(self):
       pass
 
 
@@ -71,12 +77,13 @@ class NeuralNetwork:
 def main():
     # Read Data in and convert numbers to numbers
     reader = CSVInput(sys.argv[1], first_row_titles=True)
-    print reader.titles
 
-    sigmoid = Sigmoid()
-    print sigmoid.Sigmoid([4,5,6,7,8,9])
-    print sigmoid.SigmoidPrime(np.array([4,5,6,7,8,9]))
     # print reader.data
+    neural = NeuralNetwork(reader.cols, 10, 1)
+
+    x = np.matrix(np.ones((1, reader.cols)))
+    t = np.matrix(np.ones((1, 1)))
+    neural.FeedForward(x, t)
 
 if __name__ == '__main__':
     main()
