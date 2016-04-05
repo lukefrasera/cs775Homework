@@ -104,10 +104,9 @@ def main():
     parser.add_argument('-f', '--testing_file', type=str, help='submit data to test the trained model against')
     parser.add_argument('-s', '--save_model', type=str, help='save out trained model')
     parser.add_argument('-r', '--read_model', type=str, help='read in trained model')
-    parser.add_argument('-k', '--k_neighbors', type=int, help='number of neighbors to find')
     parser.add_argument('-a', '--classa', type=int, help='class to test/train on')
     parser.add_argument('-b', '--classb', type=int, help='class to test/train on')
-    parser.add_argument('-m', '--method', type=int, help='0=KNN,1=LSE')
+    parser.add_argument('-m', '--method', type=int, help='0=Fisher Discriminant')
 
     args = parser.parse_args()
     print os.getcwd()

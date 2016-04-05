@@ -34,7 +34,7 @@ class CSVInput:
                                     elif any(true in value for true in self.boolean_true):
                                       value = 1
                             row_list.append(value)
-                    self.data.append(row_list)
+                    self.data.append(row_list[1:])
         self.rows = len(self.data)
         self.cols = len(self.data[0])
 
@@ -80,49 +80,58 @@ class GammaRPROP(Gamma):
 
 class NeuralNetwork:
     def __init__(self, feature_size, compute_components, output_size):
-        self.o_zero     = np.matrix(np.ones((1, feature_size)))
+        #self.o_zero     = np.matrix(np.ones((1, feature_size)))
         self.o_zero_bar = np.matrix(np.ones((1, feature_size + 1)))
 
-        self.W_one      = np.matrix(np.random.rand(feature_size, compute_components))
         self.W_one_bar  = np.matrix(np.random.rand(feature_size + 1, compute_components))
+        #self.W_one_bar   = np.ones([feature_size + 1, compute_components]) * 1.0
+        #self.W_one      = self.W_one_bar[0:-1,:]
 
-        self.o_one      = np.matrix(np.ones((1, compute_components)))
+        #self.o_one      = np.matrix(np.ones((1, compute_components)))
         self.o_one_bar  = np.matrix(np.ones((1, compute_components + 1)))
 
-        self.W_two      = np.matrix(np.random.rand(compute_components, output_size))
         self.W_two_bar  = np.matrix(np.random.rand(compute_components + 1, output_size))
+        #self.W_two_bar  = np.ones([compute_components + 1, output_size]) * -1.0
+        #self.W_two      = self.W_two_bar[0:-1,:]
 
         self.o_two      = np.matrix(np.ones((1, output_size)))
         self.S = Sigmoid()
 
+        self.delta_W_one_trans = np.zeros(self.W_one_bar.T.shape)
+        self.delta_W_two_trans = np.zeros(self.W_two_bar.T.shape)
+        self.gamma = 1
+
     def FeedForward(self, feature, truth):
       # Compute the Feed forward pass of an iteration on the Neural Network
       # Need to append one onto the end of each of the weight and feature vector
-      # pdb.set_trace()
-      # pdb.set_trace()
       self.o_zero_bar[0, :-1] = np.matrix(feature)
-      self.o_one = self.S.Sigmoid(self.o_zero_bar * self.W_one_bar)
+      o_one = self.S.Sigmoid(self.o_zero_bar * self.W_one_bar)
 
-      self.o_one_bar[0, :-1] = self.o_one
+      self.o_one_bar[0, :-1] = o_one
       self.o_two = self.S.Sigmoid(self.o_one_bar * self.W_two_bar)
 
-      self.error = 1.0 / 2.0 * ln.norm(truth - self.o_two)**2.0
-      print self.error
+      self.error = (truth - self.o_two)
+      #print self.error
+      return 1.0 / 2.0 * ln.norm(truth - self.o_two)**2.0
 
     def BackProp(self):
-        self.D_two = np.matrix(np.diag(self.S.SigmoidReverse(self.o_two_bar[0, :-1])))
-        self.D_one = np.matrix(np.diag(self.S.SigmoidReverse(self.o_one_bar[0, :-1])))
+        self.D_two = np.matrix(np.diag(self.S.SigmoidReverse(self.o_two)[0]))
+        self.D_one = np.matrix(np.diag(self.S.SigmoidReverse(self.o_one_bar[0,:-1])[0]))
 
-        self.S_two = self.D_two * self.error
-        self.S_one = self.D_one * self.W_two * self.S_two
+        self.S_two = self.D_two * self.error.T
+        self.S_one = self.D_one * self.W_two_bar[0:-1,:] * self.S_two
 
-        self.nabla_W_two_trans = - self.gamma * self.S_two * self.o_one  # I can't remember what the o_one_hats are from lexture so these expressions are missing something
-        self.nabla_W_one_trans = - self.gamma * self.S_one * self.o_zero # The same applies to this sepxression as well
+        self.delta_W_two_trans += (- self.gamma * self.S_two * self.o_one_bar)
+        self.delta_W_one_trans += (- self.gamma * self.S_one * self.o_zero_bar)
 
+       
         # Now A decision based on the parameters of the neural network need to be made. In this case the Either we perform the offline approach(batch mode) or the online update)
 
     def UpdateWeights(self):
-      pass
+        self.W_two_bar = self.W_two_bar - self.delta_W_two_trans.T
+        self.W_one_bar = self.W_one_bar - self.delta_W_one_trans.T
+        self.delta_W_two_trans = np.zeros(self.delta_W_two_trans.shape)
+        self.delta_W_one_trans = np.zeros(self.delta_W_one_trans.shape)
 
     def OnlineNeuralNetwork(self, iterations, features, truth):
         truth_matrix = 0  # This will prdoduce the necessary vectors for the error calculation at the end of each feed forward step
@@ -135,13 +144,31 @@ class NeuralNetwork:
 def main():
     # Read Data in and convert numbers to numbers
     reader = CSVInput(sys.argv[1], first_row_titles=True)
-
+    
     # print reader.data
-    neural = NeuralNetwork(reader.cols, 10, 1)
+    num_compute_nodes = 10
+    num_output_nodes = 2
+    pdb.set_trace()
+    neural = NeuralNetwork(reader.cols-1, num_compute_nodes, num_output_nodes)
 
-    x = np.matrix(np.ones((1, reader.cols)))
-    t = np.matrix(np.ones((1, 1)))
-    neural.FeedForward(x, t)
+    network_error_threshold = 1e-8
+    np_data = np.matrix(reader.data)
+    truth = np.matrix(np.ones((reader.rows, 2)))
+    truth[:,0:1] = np_data[:,-1]
+    truth[:,1:2] = 1-np_data[:,-1]
+    
+    count = 0
+    network_error = network_error_threshold + 1
+    while network_error > network_error_threshold:
+        for sample_index in range(reader.rows):
+            x = np.matrix(reader.data[sample_index][0:-1])
+            t = truth[sample_index]
+            network_error = neural.FeedForward(x, t)
+            neural.BackProp()
+        neural.UpdateWeights()
+        count = count + 1
+        print "Error on iteration",count,":",network_error
+    print "Final error",network_error
 
 if __name__ == '__main__':
     main()
