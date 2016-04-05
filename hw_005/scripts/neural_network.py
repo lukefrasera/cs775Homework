@@ -56,24 +56,27 @@ class Sigmoid:
         return ne.evaluate(str(self.sigmoid_reverse))
 
 class Gamma:
-    def __init__(self, initial):
-        self.gamma =  initial
+    def __init__(self, initial, size):
+        self.gamma =  np.ones((size, 1)) * initial
+
     def Update(self, E):
         pass
 
 class GammaSpeed(Gamma):
-    def __init__(self, initial, u, d):
-        self.gamma = initial
+    def __init__(self, initial, u, d, size):
+        super(GammaSpeed, self).__init__(initial, size)
         self.u = u
         self.d = d
+        self.E_p = 0
     def Update(self, E):
         pass
 
 class GammaRPROP(Gamma):
-    def __init__(self, initial, u, d):
-        self.gamma = initial
+    def __init__(self, initial, u, d, size):
+        super(GammaRPROP, self).__init__(initial, size)
         self.u = u
         self.d = d
+        self.E_p = 0
 
     def Update(self, E):
         pass
