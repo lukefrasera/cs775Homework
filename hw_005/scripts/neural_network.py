@@ -151,7 +151,7 @@ def main():
     # print reader.data
     num_compute_nodes = int(sys.argv[2])
     num_output_nodes = 2
-    pdb.set_trace()
+    #pdb.set_trace()
     neural = NeuralNetwork(reader.cols-1, num_compute_nodes, num_output_nodes)
 
     network_error_threshold = 1e-8
