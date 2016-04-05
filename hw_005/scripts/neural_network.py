@@ -86,15 +86,15 @@ class NeuralNetwork:
         #self.o_zero     = np.matrix(np.ones((1, feature_size)))
         self.o_zero_bar = np.matrix(np.ones((1, feature_size + 1)))
 
-        self.W_one_bar  = np.matrix(np.random.rand(feature_size + 1, compute_components))
-        #self.W_one_bar   = np.ones([feature_size + 1, compute_components]) * 1.0
+        #self.W_one_bar  = np.matrix(np.random.rand(feature_size + 1, compute_components))
+        self.W_one_bar   = np.ones([feature_size + 1, compute_components]) * 1.0
         #self.W_one      = self.W_one_bar[0:-1,:]
 
         #self.o_one      = np.matrix(np.ones((1, compute_components)))
         self.o_one_bar  = np.matrix(np.ones((1, compute_components + 1)))
 
-        self.W_two_bar  = np.matrix(np.random.rand(compute_components + 1, output_size))
-        #self.W_two_bar  = np.ones([compute_components + 1, output_size]) * -1.0
+        #self.W_two_bar  = np.matrix(np.random.rand(compute_components + 1, output_size))
+        self.W_two_bar  = np.ones([compute_components + 1, output_size]) * 1.0
         #self.W_two      = self.W_two_bar[0:-1,:]
 
         self.o_two      = np.matrix(np.ones((1, output_size)))
@@ -149,7 +149,7 @@ def main():
     reader = CSVInput(sys.argv[1], first_row_titles=True)
     
     # print reader.data
-    num_compute_nodes = 10
+    num_compute_nodes = int(sys.argv[2])
     num_output_nodes = 2
     pdb.set_trace()
     neural = NeuralNetwork(reader.cols-1, num_compute_nodes, num_output_nodes)
@@ -163,14 +163,16 @@ def main():
     count = 0
     network_error = network_error_threshold + 1
     while network_error > network_error_threshold:
+        network_error = 0.0
         for sample_index in range(reader.rows):
             x = np.matrix(reader.data[sample_index][0:-1])
             t = truth[sample_index]
-            network_error = neural.FeedForward(x, t)
+            network_error += neural.FeedForward(x, t)
             neural.BackProp()
         neural.UpdateWeights()
         count = count + 1
-        print "Error on iteration",count,":",network_error
+        network_error /= reader.rows
+        print "Iterations %d, error:%s"%(count,repr(network_error))
     print "Final error",network_error
 
 if __name__ == '__main__':
