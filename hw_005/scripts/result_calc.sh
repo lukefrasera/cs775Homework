@@ -3,7 +3,6 @@ gamma_list=(
   '100'
   '10'
   '1'
-  '0.1'
   )
 compute_list=(
   '1'

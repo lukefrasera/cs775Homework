@@ -109,15 +109,15 @@ class NeuralNetwork:
         #self.o_zero     = np.matrix(np.ones((1, feature_size)))
         self.o_zero_bar = np.matrix(np.ones((1, feature_size + 1)))
 
-        #self.W_one_bar  = np.matrix(np.random.rand(feature_size + 1, compute_components))
-        self.W_one_bar   = np.ones([feature_size + 1, compute_components]) * 1.0
+        self.W_one_bar  = np.matrix(np.random.rand(feature_size + 1, compute_components))
+        #self.W_one_bar   = np.ones([feature_size + 1, compute_components]) * 1.0
         #self.W_one      = self.W_one_bar[0:-1,:]
 
         #self.o_one      = np.matrix(np.ones((1, compute_components)))
         self.o_one_bar  = np.matrix(np.ones((1, compute_components + 1)))
 
-        #self.W_two_bar  = np.matrix(np.random.rand(compute_components + 1, output_size))
-        self.W_two_bar  = np.ones([compute_components + 1, output_size]) * 1.0
+        self.W_two_bar  = np.matrix(np.random.rand(compute_components + 1, output_size))
+        #self.W_two_bar  = np.ones([compute_components + 1, output_size]) * 1.0
         #self.W_two      = self.W_two_bar[0:-1,:]
 
         self.o_two      = np.matrix(np.ones((1, output_size)))
@@ -180,7 +180,7 @@ def main():
     #pdb.set_trace()
     neural = NeuralNetwork(reader.cols-1, num_compute_nodes, num_output_nodes)
 
-    network_error_threshold = 1e-8
+    network_error_threshold = 1e-4
     np_data = np.matrix(reader.data)
     truth = np.matrix(np.ones((reader.rows, 2)))
     truth[:,0:1] = np_data[:,-1]
