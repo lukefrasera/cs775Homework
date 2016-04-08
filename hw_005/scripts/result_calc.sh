@@ -6,7 +6,7 @@ gamma_list=(
   '0.1'
   )
 compute_list=(
-  '1'
+  # '1'
   '5'
   '10'
   )
