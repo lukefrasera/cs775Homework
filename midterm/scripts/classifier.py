@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 
 import numpy as np
+from numpy import linalg as la
 
 
 
 class Classifier(object):
   def __init__(self):
     pass
-  def Train(self, samples):
+  def Train(self, samples, truth):
     pass
   def Classify(self, sample):
     pass
@@ -16,23 +17,27 @@ class Classifier(object):
 class Fisher(Classifier):
   def __init__(self):
     pass
-  def Train(self, samples):
+  def Train(self, samples, truth):
     pass
   def Classify(self, sample):
     pass
 
 class Regression(Classifier):
   def __init__(self):
-    pass
-  def Train(self, samples):
-    pass
-  def Classify(self, sample):
-    pass
+    self.a = []
+  def Train(self, samples, truth):
+    samples = np.matrix(samples)
+    truth = np.matrix(truth)
+    self.a = la.inv(samples.T * smples) * smples.T * truth
+
+  def Classify(self, samples):
+    samples = np.matrix(samples)
+    return samples * self.a
 
 class Gaussian(Classifier):
   def __init__(self):
     pass
-  def Train(self, samples):
+  def Train(self, samples, truth):
     pass
   def Classify(self, sample):
     pass
