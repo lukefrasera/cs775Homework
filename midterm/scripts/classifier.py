@@ -11,7 +11,8 @@ class Classifier(object):
     pass
   def Classify(self, sample):
     pass
-
+  def ReformatData(self):
+    pass
 
 class Fisher(Classifier):
   def __init__(self):
@@ -19,6 +20,8 @@ class Fisher(Classifier):
   def Train(self, samples):
     pass
   def Classify(self, sample):
+    pass
+  def ReformatData(self):
     pass
 
 class Regression(Classifier):
@@ -28,6 +31,8 @@ class Regression(Classifier):
     pass
   def Classify(self, sample):
     pass
+  def ReformatData(self):
+    pass
 
 class Gaussian(Classifier):
   def __init__(self):
@@ -36,12 +41,14 @@ class Gaussian(Classifier):
     pass
   def Classify(self, sample):
     pass
+  def ReformatData(self):
+    pass
 
 class ClassiferTest(object):
   def __init__(self, classifier, training_set, testing_set):
-    self.classifier = classifier
+    self.classifier   = classifier
     self.training_set = training_set
-    self.testing_set = testing_set
+    self.testing_set  = testing_set
 
   def Training(self):
     pass
