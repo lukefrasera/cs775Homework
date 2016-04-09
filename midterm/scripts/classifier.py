@@ -45,6 +45,11 @@ class Fisher(Classifier):
     b_projected = self.projection * b_samples
 
     # genreate gaussian classifier
+    a_mean_proj = np.mean(a_projected, 0).T
+    b_mean_proj = np.mean(b_projected, 0).T
+
+    a_cov_proj  = np,cov(a_projected).T
+    b_cov_proj  = np,cov(b_projected).T
   def Classify(self, sample):
     pass
   def ReformatData(self, samples, truth):
