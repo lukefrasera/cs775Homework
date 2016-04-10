@@ -4,6 +4,7 @@ import numpy as np
 from numpy import linalg as la
 import numexpr as ne
 import sys, csv
+import pdb
 
 class CSVInput:
   def __init__(self, filename, first_row_titles=False, num_convert=True, set_true_false_01=True):
@@ -44,7 +45,6 @@ class Classifier(object):
   def Classify(self, sample):
     pass
   def ReformatData(self):
-    pass
     return (samples, truth)
 
 class Fisher(Classifier):
@@ -57,8 +57,8 @@ class Fisher(Classifier):
 
   def Train(self, samples, truth):
     # solve for projection
-    a_samples = samples[truth == self.c_a]
-    b_samples = samples[truth == self.c_b]
+    a_samples = np.asmatrix(samples[np.asarray(truth.T)[0] == self.c_a])
+    b_samples = np.asmatrix(samples[np.asarray(truth.T)[0] == self.c_b])
 
     # ompute mean and covariance
     a_mean = np.mean(a_samples, 0).T
@@ -68,23 +68,23 @@ class Fisher(Classifier):
     b_cov  = np.cov(b_samples.T)
 
     # Compute fisher criteria projection to one dimension
-    self.projection = la.inv(a_cov + b_cov) * (a_mean - b_mean)
-    self.projection /= la.norm(sel.projection)
+    self.projection = la.inv((a_cov + b_cov) + np.eye(a_cov.shape[0]) * 0.00001) * (a_mean - b_mean)
+    self.projection /= la.norm(self.projection)
 
     # project all of the data
-    a_projected = self.projection * a_samples
-    b_projected = self.projection * b_samples
+    a_projected = a_samples * self.projection
+    b_projected = b_samples * self.projection
 
     # genreate gaussian classifier
     self.a_gauss = Gaussian()
     self.b_gauss = Gaussian()
 
-    self.a_guass.Train(a_projected)
-    self.b_guass.Train(b_projected)
+    self.a_gauss.Train(a_projected)
+    self.b_gauss.Train(b_projected)
 
   def Classify(self, samples):
     # project samples into space
-    projected = self.projection * samples
+    projected = samples * self.projection
 
     # Perform Gaussian classification
     a_prob = self.a_gauss.Classify(projected)
@@ -96,27 +96,35 @@ class Fisher(Classifier):
     return ne.evaluate('where(a_prob > b_prob, a, b)')
 
   def ReformatData(self, samples, truth):
-    ref_samples = np.ones((len(samples), len(samples[0])+1))
+    ref_samples = np.ones((samples.shape[0], samples.shape[1]+1))
     ref_samples[:, 1:] = np.matrix(samples)
 
     ref_truth = np.matrix(truth)
     return (ref_samples, ref_truth)
 
 class Regression(Classifier):
-  def __init__(self):
+  def __init__(self, class_a, class_b):
     self.a = []
+    self.c_a = class_a
+    self.c_b = class_b
 
   def Train(self, samples, truth):
     samples = np.matrix(samples)
     truth = np.matrix(truth)
-    self.a = la.inv(samples.T * smples) * smples.T * truth
+    self.a = la.inv(samples.T * samples) * samples.T * truth
 
   def Classify(self, samples):
     samples = np.matrix(samples)
-    return samples * self.a
+    projection = samples * self.a
+    result = np.zeros(projection.shape)
+
+    result[projection < 0] = self.c_a
+    result[projection >=0] = self.c_b
+
+    return result
 
   def ReformatData(self, samples, truth):
-    ref_samples = np.ones((len(samples), len(samples[0])+1))
+    ref_samples = np.ones((samples.shape[0], samples.shape[1]+1))
     ref_samples[:, 1:] = np.matrix(samples)
 
     ref_truth = np.matrix(truth) * 2 - 1
@@ -129,20 +137,26 @@ class Gaussian(Classifier):
     self.normalizer = []
   def Train(self, samples):
     self.mean = np.mean(samples, 0).T
-    self.cov = np.cov(samples)
-    self.cov_inv = self.cov.I
+    self.cov = np.cov(samples.T)
+    if self.cov.shape != ():
+      self.cov_inv = la.inv(self.cov)
+    else:
+      self.cov_inv = 1.0 / self.cov
 
     # Compute normalizing term
-    self.normalizer = 1.0 / (np.sqrt(la.det(2.0 * np.pi * self.cov)))
+    if self.cov.shape != ():
+      self.normalizer = 1.0 / (np.sqrt(la.det(2.0 * np.pi * self.cov)))
+    else:
+      self.normalizer = 1.0 / (np.sqrt(2.0 * np.pi * self.cov))
 
   def ClassifySample(self, sample):
     return self.normalizer * np.exp(- 0.5 * (sample - self.mean).T * self.cov_inv * (sample - self.mean))
 
   def Classify(self, samples):
     # compute mahalanobis distance
-    dist = self.cov_inv * samples
-    dist = np.multiply(samples, dist)
-    dist = np.sum(dist, 0)
+    dist = self.cov_inv * samples.T
+    dist = np.multiply(samples.T, dist)
+    dist = np.sum(dist, 0).T
     # compute exponent
     return self.normalizer * np.exp(-0.5 * dist)
 
@@ -160,14 +174,17 @@ class Random(Classifier):
 
   def Train(self, samples, truth):
     # randomly select projection
-    self.projection = np.random(1, len(samples[0]))
+    self.projection = np.random.rand(samples.shape[1], 1)
+    self.projection /= la.norm(self.projection)
 
+    # pdb.set_trace()
     # project training samples
-    a_samples = samples[truth == self.c_a]
-    b_samples = samples[truth == self.c_b]
+    a_samples = np.asmatrix(samples[np.asarray(truth.T)[0] == self.c_a])
+    b_samples = np.asmatrix(samples[np.asarray(truth.T)[0] == self.c_b])
 
-    a_projected = self.projection * a_samples
-    b_projected = self.projection * b_samples
+    # pdb.set_trace()
+    a_projected = a_samples * self.projection
+    b_projected = b_samples * self.projection
 
     self.a_gauss = Gaussian()
     self.b_gauss = Gaussian()
@@ -176,23 +193,26 @@ class Random(Classifier):
     self.b_gauss.Train(b_projected)
 
   def Classify(self, samples):
-    projected = self.projection * samples
+    # project samples into space
+    # pdb.set_trace()
+    projected = samples * self.projection
 
-    a = self.c_a
-    b = selg.c_b
-
+    # Perform Gaussian classification
     a_prob = self.a_gauss.Classify(projected)
     b_prob = self.b_gauss.Classify(projected)
+    a = self.c_a
+    b = self.c_b
 
+    # classify against probability
     return ne.evaluate('where(a_prob > b_prob, a, b)')
 
 
   def ReformatData(self, samples, truth):
-    ref_samples = np.ones((len(samples), len(samples[0])+1))
+    ref_samples = np.ones((samples.shape[0], samples.shape[1]+1))
     ref_samples[:, 1:] = np.matrix(samples)
 
     ref_truth = np.matrix(truth)
-    return (ref_samples, ref_truth)
+    return (np.asmatrix(ref_samples), ref_truth)
 
 class ClassiferTest(object):
   def __init__(self, classifier, training_set, testing_set):
@@ -215,25 +235,48 @@ def GenerateTable(results):
 
 def main():
   ''' Test the classes for performance and corrrecness'''
-  samples = CSVInput(sys.argv[1], first_row_titles=False)
-  truth = CSVInput(sys.argv[2], first_row_titles=False)
+  data = CSVInput(sys.argv[1], first_row_titles=False)
+  # truth = CSVInput(sys.argv[2], first_row_titles=False)
+  samples = np.matrix(data.data)
+  truth = samples[:,-1]
+  samples = samples[:,:-1]
 
-  regression = Regression()
-  gaussian = Gaussian()
+  # print samples, samples.shape
+  # print truth, truth.shape
+
+
+  regression = Regression(0, 1)
+  reg_samples, reg_truth = regression.ReformatData(samples, truth)
+  regression.Train(reg_samples, reg_truth)
+  reg_result = regression.Classify(reg_samples)
+  compare = reg_result - ((reg_truth + 1.0)/ 2.0)
+  compare = compare != 0
+  print "Regression:"
+  print float(np.sum(compare)) / float(compare.shape[0])
+  print compare.shape
+  
   fisher = Fisher(0, 1)
+  fish_samples, fish_truth = fisher.ReformatData(samples, truth)
+  fisher.Train(fish_samples, fish_truth)
+  fish_result = fisher.Classify(fish_samples)
+
+  compare = fish_result - fish_truth
+  compare = compare != 0
+  print "Fisher"
+  print float(np.sum(compare)) / float(compare.shape[0])
+  print compare.shape
+  
   random = Random(0, 1)
+  rand_samples, rand_truth = random.ReformatData(samples, truth)
+  random.Train(rand_samples, rand_truth)
+  rand_result = random.Classify(rand_samples)
 
-  reg_samples, reg_truth = regression.ReformatData(samples.data, truth.data)
-  # print reg_samples
-  # print reg_truth
+  compare = rand_result - rand_truth
+  compare = compare != 0
 
-  gauss_samples = gaussian.ReformatData(samples.data)
-
-  # print gauss_samples
-
-  fish_samples, fish_truth = fisher.ReformatData(samples.data, truth.data)
-  print fish_samples
-  print fish_truth
+  print "Random"
+  print float(np.sum(compare)) / float(compare.shape[0])
+  print compare.shape
 
   # testing = ClassifierTest(classifier, training_set, testing_set)
 
