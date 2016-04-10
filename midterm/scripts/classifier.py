@@ -214,18 +214,77 @@ class Random(Classifier):
     ref_truth = np.matrix(truth)
     return (np.asmatrix(ref_samples), ref_truth)
 
+################################################################################
+# Decision Tree Classifier
+################################################################################
+class Node(object):
+  def __init__(self, classifier):
+    self.classifier = classifier
+    self.left  = None
+    self.right = None
+
+class DecisionTree(classifier):
+  def __init__(self, classifier, max_depth=-1):
+    self.tree = []
+    self.classifier = classifier
+  def ReformatData(self, samples, truth):
+    return self.classifier.ReformatData(samples, truth)
+  def Train(self, samples, truth):
+    pass
+  def TrainRecur(self, parent, side, samples, truth):
+    node = Node(self.classifier)
+    node.classifier.Train(samples, truth)
+    result = node.classifier.Classify(samples)
+
+    compare = (result - truth) != 0
+    a_compare = np.sum(compare[result == 0])
+    b_compare = np.sum(compare[result == 1])
+
+    if a_compare > 0:
+      a_samples = samples[result == 0]
+      a_truth   = truth[result == 0]
+      self.TrainRecur(node, 0, a_samples, a_truth)
+
+    if b_compare > 0:
+      b_samples = samples[result == 1]
+      b_truth   = truth[result == 1]
+      self.TrainRecur(node, 1, b_samples, b_truth)
+    
+    if side == 0:
+      parent.left = node
+    else:
+      parent.right = node
+
+  def Classify(self, samples):
+    pass
+
 class ClassiferTest(object):
-  def __init__(self, classifier, training_set, testing_set):
+  def __init__(self, classifier, training_set):
     self.classifier   = classifier
-    self.training_set = training_set
-    self.testing_set  = testing_set
+    self.train_data, self.train_truth = self.classifier.ReformatData(training_set[0], training_set[1])
+    # self.test_data, self.test_truth   = self.classifier.ReformatData(testing_set[0], testing_set[1])
+    self.train_truth_raw = training_set[1]
+    # self.test_truth_raw = testing_set[1]
 
   def Training(self):
-    pass
+    self.classifier.Train(self.train_data, self.train_truth)
   def Testing(self):
-    pass
+    self.train_result = self.classifier.Classify(self.train_data)
+    # self.test_result  = self.classifier.Classify(self.test_data)
   def Results(self):
-    pass
+    compare = self.train_result - self.train_truth_raw
+    compare = compare != 0
+
+    a_compare = compare[self.train_truth_raw == 0]
+    b_compare = compare[self.train_truth_raw == 1]
+
+    error_rate = float(np.sum(compare)) / float(compare.shape[0])
+    a_miss_class = float(np.sum(a_compare)) / float(a_compare.shape[1])
+    b_miss_class = float(np.sum(b_compare)) / float(b_compare.shape[1])
+
+    print error_rate
+    print a_miss_class
+    print b_miss_class
 
 def GraphResults(results):
   pass
@@ -244,45 +303,24 @@ def main():
   # print samples, samples.shape
   # print truth, truth.shape
 
-
   regression = Regression(0, 1)
-  reg_samples, reg_truth = regression.ReformatData(samples, truth)
-  regression.Train(reg_samples, reg_truth)
-  reg_result = regression.Classify(reg_samples)
-  compare = reg_result - ((reg_truth + 1.0)/ 2.0)
-  compare = compare != 0
-  print "Regression:"
-  print float(np.sum(compare)) / float(compare.shape[0])
-  print compare.shape
-  
+  classify_test = ClassiferTest(regression, (samples, truth))
+  classify_test.Training()
+  classify_test.Testing()
+  classify_test.Results()
+
   fisher = Fisher(0, 1)
-  fish_samples, fish_truth = fisher.ReformatData(samples, truth)
-  fisher.Train(fish_samples, fish_truth)
-  fish_result = fisher.Classify(fish_samples)
+  classify_test = ClassiferTest(fisher, (samples, truth))
+  classify_test.Training()
+  classify_test.Testing()
+  classify_test.Results()
 
-  compare = fish_result - fish_truth
-  compare = compare != 0
-  print "Fisher"
-  print float(np.sum(compare)) / float(compare.shape[0])
-  print compare.shape
-  
   random = Random(0, 1)
-  rand_samples, rand_truth = random.ReformatData(samples, truth)
-  random.Train(rand_samples, rand_truth)
-  rand_result = random.Classify(rand_samples)
+  classify_test = ClassiferTest(random, (samples, truth))
+  classify_test.Training()
+  classify_test.Testing()
+  classify_test.Results()
 
-  compare = rand_result - rand_truth
-  compare = compare != 0
-
-  print "Random"
-  print float(np.sum(compare)) / float(compare.shape[0])
-  print compare.shape
-
-  # testing = ClassifierTest(classifier, training_set, testing_set)
-
-  # testing.Training()
-  # testing.Testing()
-  # results = testing.Results()
 
   # GraphResults(results)
   # GenerateTable(results)
