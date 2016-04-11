@@ -5,6 +5,7 @@ from numpy import linalg as la
 import numexpr as ne
 import sys, csv
 import pdb
+import copy
 
 class CSVInput:
   def __init__(self, filename, first_row_titles=False, num_convert=True, set_true_false_01=True):
@@ -110,8 +111,11 @@ class Regression(Classifier):
 
   def Train(self, samples, truth):
     samples = np.matrix(samples)
-    truth = np.matrix(truth)
-    self.a = la.inv(samples.T * samples) * samples.T * truth
+    truth = np.matrix(truth * 2 - 1)
+    try:
+      self.a = la.inv(samples.T * samples) * samples.T * truth
+    except la.linalg.LinAlgError:
+      self.a = la.inv(samples.T * samples + np.eye(samples.shape[1]) * 0.0000001) * samples.T * truth
 
   def Classify(self, samples):
     samples = np.matrix(samples)
@@ -127,8 +131,8 @@ class Regression(Classifier):
     ref_samples = np.ones((samples.shape[0], samples.shape[1]+1))
     ref_samples[:, 1:] = np.matrix(samples)
 
-    ref_truth = np.matrix(truth) * 2 - 1
-    return (ref_samples, ref_truth)
+    ref_truth = np.matrix(truth)
+    return (np.asmatrix(ref_samples), ref_truth)
 
 class Gaussian(Classifier):
   def __init__(self):
@@ -223,40 +227,60 @@ class Node(object):
     self.left  = None
     self.right = None
 
-class DecisionTree(classifier):
-  def __init__(self, classifier, max_depth=-1):
-    self.tree = []
+class DecisionTree(Classifier):
+  def __init__(self, classifier, class_a, class_b, max_depth=100):
+    self.tree = Node(copy.deepcopy(classifier))
     self.classifier = classifier
+    self.max_depth = max_depth
   def ReformatData(self, samples, truth):
     return self.classifier.ReformatData(samples, truth)
   def Train(self, samples, truth):
-    pass
-  def TrainRecur(self, parent, side, samples, truth):
-    node = Node(self.classifier)
+    # pdb.set_trace()
+    self.TrainRecur(self.tree, samples, truth, 0)
+  def TrainRecur(self, node, samples, truth, depth):
+    if depth > self.max_depth:
+      return
+
     node.classifier.Train(samples, truth)
     result = node.classifier.Classify(samples)
 
-    compare = (result - truth) != 0
-    a_compare = np.sum(compare[result == 0])
-    b_compare = np.sum(compare[result == 1])
+    compare   = result != truth
+    a_compare = np.sum(compare[result.T[0] == 0])
+    b_compare = np.sum(compare[result.T[0] == 1])
 
+    # pdb.set_trace()
     if a_compare > 0:
-      a_samples = samples[result == 0]
-      a_truth   = truth[result == 0]
-      self.TrainRecur(node, 0, a_samples, a_truth)
+      a_samples  = samples[result.T[0] == 0]
+      a_truth    = truth[result.T[0] == 0]
+      node.left  = Node(self.classifier)
+      self.TrainRecur(node.left, a_samples, a_truth, depth + 1)
 
     if b_compare > 0:
-      b_samples = samples[result == 1]
-      b_truth   = truth[result == 1]
-      self.TrainRecur(node, 1, b_samples, b_truth)
-    
-    if side == 0:
-      parent.left = node
-    else:
-      parent.right = node
+      b_samples  = samples[result.T[0] == 1]
+      b_truth    = truth[result.T[0] == 1]
+      node.right = Node(self.classifier)
+      self.TrainRecur(node.right, b_samples, b_truth, depth + 1)
 
   def Classify(self, samples):
-    pass
+    return self.ClassifyRecur(self.tree, samples)
+
+  def ClassifyRecur(self, node, samples):
+    result = node.classifier.Classify(samples)
+    output = np.zeros(result.shape)
+    if node.left:
+      a_samples = samples[result.T[0] == 0]
+      a_result = self.ClassifyRecur(node.left, a_samples)
+      output[result.T[0] == 0] = a_result
+    else:
+      output[result.T[0] == 0] = result[result.T[0] == 0]
+
+    if node.right:
+      b_samples = samples[result.T[0] == 1]
+      b_result = self.ClassifyRecur(node.right, b_samples)
+      output[result.T[0] == 1] = b_result
+    else:
+      output[result.T[0] == 1] = result[result.T[0] == 1]
+    return output
 
 class ClassiferTest(object):
   def __init__(self, classifier, training_set):
@@ -303,23 +327,30 @@ def main():
   # print samples, samples.shape
   # print truth, truth.shape
 
-  regression = Regression(0, 1)
-  classify_test = ClassiferTest(regression, (samples, truth))
-  classify_test.Training()
-  classify_test.Testing()
-  classify_test.Results()
+  # regression = Regression(0, 1)
+  # classify_test = ClassiferTest(regression, (samples, truth))
+  # classify_test.Training()
+  # classify_test.Testing()
+  # classify_test.Results()
 
-  fisher = Fisher(0, 1)
-  classify_test = ClassiferTest(fisher, (samples, truth))
-  classify_test.Training()
-  classify_test.Testing()
-  classify_test.Results()
+  # fisher = Fisher(0, 1)
+  # classify_test = ClassiferTest(fisher, (samples, truth))
+  # classify_test.Training()
+  # classify_test.Testing()
+  # classify_test.Results()
 
-  random = Random(0, 1)
-  classify_test = ClassiferTest(random, (samples, truth))
-  classify_test.Training()
-  classify_test.Testing()
-  classify_test.Results()
+  # random = Random(0, 1)
+  # classify_test = ClassiferTest(random, (samples, truth))
+  # classify_test.Training()
+  # classify_test.Testing()
+  # classify_test.Results()
+
+  decision_tree = DecisionTree(Regression(0,1), 0,1)
+  dec_samples, dec_truth = decision_tree.ReformatData(samples, truth)
+  decision_tree.Train(dec_samples, dec_truth)
+  dec_result = decision_tree.Classify(dec_samples)
+  print float(np.sum(dec_result != dec_truth)) / float(dec_result.shape[0])
+  print dec_result.shape
 
 
   # GraphResults(results)
