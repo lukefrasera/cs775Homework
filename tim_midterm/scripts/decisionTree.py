@@ -13,8 +13,8 @@ import operator
 import random
 import warnings
 
-FISHER = 1
-
+FISHER = 0
+RANDOM_CLASSIFIER = 0
 def binaryClassify_fisher(train_features, train_truth, test_features, test_truth, classa, classb, max_iterations):
     print 5000-max_iterations
     if max_iterations <= 0:
@@ -22,7 +22,7 @@ def binaryClassify_fisher(train_features, train_truth, test_features, test_truth
         quit()
     max_iterations -= 1
     #perform a classification on the data
-    if FISHER:
+    if FISHER or RANDOM_CLASSIFIER:
     	train_classification_result, test_classification_result = FisherClassifier(train_features, train_truth, test_features, classa, classb)
     else: #linear regression
       train_classification_result, test_classification_result = LinearRegression(train_features, train_truth, test_features, classa, classb)
@@ -30,14 +30,15 @@ def binaryClassify_fisher(train_features, train_truth, test_features, test_truth
     #select the items which are really in class 0
     class_a_samples = train_classification_result[train_truth == classa]
     class_b_samples = train_classification_result[train_truth == classb]
-    print "class_a_train_rate %f"%(np.sum(class_a_samples)/class_a_samples.shape[0])
-    print "class_b_train_rate %f"%(1.0 - np.sum(class_b_samples)/class_b_samples.shape[0])
+    print "class_a_train_rate %f"%(float(np.sum(class_a_samples))/class_a_samples.shape[0])
+    print "class_b_train_rate %f"%(1.0 - float(np.sum(class_b_samples))/class_b_samples.shape[0])
     class_a_test_samples = test_classification_result[test_truth == classa]
     class_b_test_samples = test_classification_result[test_truth == classb]
-    print "class_a_test_rate %f"%(np.sum(class_a_test_samples)/class_a_test_samples.shape[0])
-    print "class_b_test_rate %f"%(1.0 - np.sum(class_b_test_samples)/class_b_test_samples.shape[0])
+    print "class_a_test_rate %f"%(float(np.sum(class_a_test_samples))/class_a_test_samples.shape[0])
+    print "class_b_test_rate %f"%(1.0 - float(np.sum(class_b_test_samples))/class_b_test_samples.shape[0])
     #sum errors from every recursion
-    num_errors = 0
+    num_a_errors = 0
+    num_b_errors = 0
     if not np.all(class_a_samples == classa) and not np.all(class_a_samples == classb) and not np.all(test_truth[test_classification_result == classa]) and np.any(test_truth[test_classification_result == classa]) and not np.all(train_truth[train_classification_result == classa]) and np.any(train_truth[train_classification_result == classa]):
         #recurse on this branch
 	new_train_features = train_features[train_classification_result==classa]
@@ -45,12 +46,14 @@ def binaryClassify_fisher(train_features, train_truth, test_features, test_truth
         new_test_features = test_features[test_classification_result==classa]
         new_test_truth = test_truth[test_classification_result == classa]
         print "left test: %4d, left train: %4d"%(new_test_truth.shape[0],new_train_truth.shape[0])
-        num_errors += binaryClassify_fisher(new_train_features, new_train_truth, new_test_features, new_test_truth, classa, classb, max_iterations)
+        tempa, tempb = binaryClassify_fisher(new_train_features, new_train_truth, new_test_features, new_test_truth, classa, classb, max_iterations)
+        num_a_errors += tempa
+        num_b_errors += tempb
     else:
         #the sample was "pure" so result results on it
         #compute the number of errors in this dataset
         #check what the previous output was (we only have to check the first element since they are all the same
-        num_errors += np.sum(test_classification_result[test_truth == classa] == classa)
+        num_a_errors += test_truth[test_truth==classa].shape[0] - np.sum(test_classification_result[test_truth == classa] == classa)
     if not np.all(class_b_samples == classb) and not np.all(class_b_samples == classa) and not np.all(test_truth[test_classification_result == classb]) and np.any(test_truth[test_classification_result == classb]) and not np.all(train_truth[train_classification_result == classb]) and np.any(train_truth[train_classification_result == classb]):
         #recurse on this branch
 	new_train_features = train_features[train_classification_result==classb]
@@ -58,14 +61,16 @@ def binaryClassify_fisher(train_features, train_truth, test_features, test_truth
         new_test_features = test_features[test_classification_result==classb]
         new_test_truth = test_truth[test_classification_result == classb]
         print "right test: %4d, right train: %4d"%(new_test_truth.shape[0],new_train_truth.shape[0])
-        num_errors += binaryClassify_fisher(new_train_features, new_train_truth, new_test_features, new_test_truth, classa, classb, max_iterations)
+        tempa,tempb = binaryClassify_fisher(new_train_features, new_train_truth, new_test_features, new_test_truth, classa, classb, max_iterations)
+        num_a_errors += tempa
+        num_b_errors += tempb
     else:
         #the sample was "pure" so result results on it
         #compute the number of errors in this dataset
         #check what the previous output was (we only have to check the first element since they are all the same
-        num_errors += np.sum(test_classification_result[test_truth == classb] == classb)
+        num_b_errors += test_truth[test_truth == classb].shape[0] - np.sum(test_classification_result[test_truth == classb] == classb)
  
-    return num_errors
+    return num_a_errors, num_b_errors
 
 def LinearRegression(train_features, train_truth, test_features, classa, classb):
      train_truth_internal = np.matrix(train_truth.copy()).T
@@ -84,6 +89,7 @@ def LinearRegression(train_features, train_truth, test_features, classa, classb)
 
 def FisherClassifier(train_features, train_truth, test_features, classa, classb):
   with warnings.catch_warnings():
+    #if RANDOM_CLASSIFIER:
     warnings.filterwarnings('error')
     '''
     :param features:
@@ -116,7 +122,7 @@ def FisherClassifier(train_features, train_truth, test_features, classa, classb)
           projection = la.inv(class_a_cov + class_b_cov + np.eye(class_a_cov.shape[0])*10e-15) * (class_a_mean - class_b_mean)
         except:
           pdb.set_trace()
-      else: #if RANDOM
+      else: #if RANDOM_CLASSIFIER
         projection = np.matrix(np.zeros(class_a_cov.shape[0]))
         for idx in range(projection.shape[0]):
           projection[idx] = random.random()
@@ -214,7 +220,6 @@ def ParseData(raw_data):
 def main():
     parser = argparse.ArgumentParser(description='Process input')
     parser.add_argument('-t', '--training_file', type=str, help='submit data to train against')
-    parser.add_argument('-f', '--testing_file', type=str, help='submit data to test the trained model against')
     parser.add_argument('-d', '--traintest_file', type=str, help='List indicating which data is training vs. test')
 
     args = parser.parse_args()
@@ -259,9 +264,11 @@ def main():
     with open(args.traintest_file) as file:
         raw_data = file.read()
         traintest_data = ParseData(raw_data)
-        
-    num_errors = binaryClassify_fisher(train_features, train_truth, test_features, test_truth, 0, 1, max_iterations)
-    print "Total errors: %d of %d, %% error:%f"%(num_errors,test_truth.shape[0],float(num_errors)/test_truth.shape[0])
+    num_a_errors,num_b_errors = binaryClassify_fisher(train_features, train_truth, test_features, test_truth, 0, 1, max_iterations)
+    classa = 0
+    classb = 1
+    print "Total a errors: %d of %d, %% error:%f"%(num_a_errors,test_truth[test_truth==classa].shape[0],float(num_a_errors)/test_truth[test_truth==classa].shape[0])
+    print "Total b errors: %d of %d, %% error:%f"%(num_b_errors,test_truth[test_truth==classb].shape[0],float(num_b_errors)/test_truth[test_truth==classb].shape[0])
 if __name__ == '__main__':
     main()
 
