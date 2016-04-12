@@ -45,7 +45,7 @@ class Classifier(object):
     pass
   def Classify(self, sample):
     pass
-  def ReformatData(self):
+  def ReformatData(self, samples, truth):
     return (samples, truth)
 
 class Fisher(Classifier):
@@ -281,6 +281,8 @@ class DecisionTree(Classifier):
     else:
       output[result.T[0] == 1] = result[result.T[0] == 1]
     return output
+################################################################################
+################################################################################
 
 class ClassiferTest(object):
   def __init__(self, classifier, training_set):
