@@ -89,7 +89,6 @@ def LinearRegression(train_features, train_truth, test_features, classa, classb)
 
 def FisherClassifier(train_features, train_truth, test_features, classa, classb):
   with warnings.catch_warnings():
-    #if RANDOM_CLASSIFIER:
     warnings.filterwarnings('error')
     '''
     :param features:
