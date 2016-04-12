@@ -13,44 +13,49 @@ import operator
 import random
 
 def binaryClassify_fisher(train_features, train_truth, test_features, test_truth, classa, classb, max_iterations):
+    print 4600-max_iterations
     if max_iterations <= 0:
         print "Something went wrong, the maximum recursion depth was exceeded"
         quit()
     max_iterations -= 1
     #perform a classification on the data
-    pdb.set_trace()
+    #pdb.set_trace()
     train_classification_result, test_classification_result = FisherClassifier(train_features, train_truth, test_features, classa, classb)
     #check to see if either classification is "pure"
     #select the items which are really in class 0
-    class_a_samples = train_classification_result[test_truth == classa]
-    class_b_samples = train_classification_result[test_truth == classb]
+    class_a_samples = train_classification_result[train_truth == classa]
+    class_b_samples = train_classification_result[train_truth == classb]
     #sum errors from every recursion
     num_errors = 0
-    if not np.all(class_a_samples == classa) and not np.all(class_a_samples == classb):
+    if not np.all(class_a_samples == classa) and not np.all(class_a_samples == classb) and not np.all(test_truth[test_classification_result == classa]) and np.any(test_truth[test_classification_result == classa]):
         #recurse on this branch
-        #arbitrarily say "A" is left and "B" is right
-        left_test_features = np.matrix(np.array([test_features[index,:] for index,sample in enumerate(test_classification_result) if sample==classa]).squeeze())
-        left_test_truth = np.array(np.matrix(test_truth)[(test_classification_result == classa).T].T)
-	left_train_features = np.matrix(np.array([train_features[index,:] for index,sample in enumerate(train_classification_result) if sample==classa]).squeeze())
-        left_train_truth = np.array(np.matrix(train_truth)[(train_classification_result == classa).T].T)[:,0]
-	#for now just pass the entire training dataset
-        num_errors += binaryClassify_fisher(left_train_features, left_train_truth, left_test_features, left_test_truth, classa, classb, max_iterations)
+	new_train_features = train_features[train_classification_result==classa]
+        new_train_truth = train_truth[train_classification_result == classa]
+        new_test_features = test_features[test_classification_result==classa]
+        new_test_truth = test_truth[test_classification_result == classa]
+        print "left test: %4d, left train: %4d"%(new_test_truth.shape[0],new_train_truth.shape[0])
+        num_errors += binaryClassify_fisher(new_train_features, new_train_truth, new_test_features, new_test_truth, classa, classb, max_iterations)
     else:
         #the sample was "pure" so result results on it
         #compute the number of errors in this dataset
         #check what the previous output was (we only have to check the first element since they are all the same
-        pdb.set_trace()
-        test_set_errors = test_classification_result != class_a_samples[0]
-        num_errors += np.sum(test_set_errors)
-    if not np.all(class_b_samples == classb) and not np.all(class_b_samples == classa):
+        #pdb.set_trace()
+        num_errors += np.sum(test_classification_result[test_truth == classa] == classa)
+    if not np.all(class_b_samples == classb) and not np.all(class_b_samples == classa) and not np.all(test_truth[test_classification_result == classb]) and np.any(test_truth[test_classification_result == classb]):
         #recurse on this branch
-        #arbitrarily say "A" is left and "B" is right
-        right_test_features = np.matrix(np.array([test_features[index,:] for index,sample in enumerate(test_classification_result) if sample==classb]).squeeze())
-        right_test_truth = np.array(np.matrix(test_truth)[(test_classification_result == classb).T].T)
-	right_train_features = np.matrix(np.array([train_features[index,:] for index,sample in enumerate(train_classification_result) if sample==classb]).squeeze())
-        right_train_truth = np.array(np.matrix(train_truth)[(train_classification_result == classb).T].T)[:,0]
-	#for now just pass the entire training dataset
-        num_errors += binaryClassify_fisher(right_train_features, right_train_truth, right_test_features, right_test_truth, classa, classb, max_iterations)
+	new_train_features = train_features[train_classification_result==classb]
+        new_train_truth = train_truth[train_classification_result == classb]
+        new_test_features = test_features[test_classification_result==classb]
+        new_test_truth = test_truth[test_classification_result == classb]
+        print "right test: %4d, right train: %4d"%(new_test_truth.shape[0],new_train_truth.shape[0])
+        num_errors += binaryClassify_fisher(new_train_features, new_train_truth, new_test_features, new_test_truth, classa, classb, max_iterations)
+    else:
+        #the sample was "pure" so result results on it
+        #compute the number of errors in this dataset
+        #check what the previous output was (we only have to check the first element since they are all the same
+        #pdb.set_trace()
+        num_errors += np.sum(test_classification_result[test_truth == classb] == classb)
+ 
     return num_errors
 
 def FisherClassifier(train_features, train_truth, test_features, classa, classb):
@@ -71,7 +76,10 @@ def FisherClassifier(train_features, train_truth, test_features, classa, classb)
     class_b_cov  = np.cov(class_b_features.T)
 
     # compute the Fisher criteria projection to one dimension
-    projection_a = la.inv(class_a_cov + class_b_cov) * (class_a_mean - class_b_mean)
+    try:
+        projection_a = la.inv(class_a_cov + class_b_cov + np.eye(class_a_cov.shape[0])*10e-15) * (class_a_mean - class_b_mean)
+    except:
+        pdb.set_trace()
     projection_a = projection_a / la.norm(projection_a)
 
     # project all of the data
@@ -107,7 +115,7 @@ def FisherClassifier(train_features, train_truth, test_features, classa, classb)
             train_classification_result.append(classa)
         else:
             train_classification_result.append(classb)
-    return [np.matrix(train_classification_result).T,np.matrix(test_classification_result).T]
+    return [np.array(train_classification_result).T,np.array(test_classification_result).T]
 
 def GaussianBuild(features):
     """
@@ -193,7 +201,8 @@ def main():
         quit()
     #iteratively call the classifier to build a binary tree until the classification is perfect or a timeout is reached
     max_iterations = test_features.shape[0]
-    binaryClassify_fisher(train_features, train_truth, test_features, test_truth, 0, 1, max_iterations)
+    num_errors = binaryClassify_fisher(train_features, train_truth, test_features, test_truth, 0, 1, max_iterations)
+    print "Total errors: %d"%num_errors
 if __name__ == '__main__':
     main()
 
