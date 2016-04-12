@@ -11,20 +11,31 @@ from scipy import spatial
 import time
 import operator
 import random
+import warnings
+
+FISHER = 1
 
 def binaryClassify_fisher(train_features, train_truth, test_features, test_truth, classa, classb, max_iterations):
-    print 4600-max_iterations
+    print 5000-max_iterations
     if max_iterations <= 0:
         print "Something went wrong, the maximum recursion depth was exceeded"
         quit()
     max_iterations -= 1
     #perform a classification on the data
-    #pdb.set_trace()
-    train_classification_result, test_classification_result = FisherClassifier(train_features, train_truth, test_features, classa, classb)
+    if FISHER:
+    	train_classification_result, test_classification_result = FisherClassifier(train_features, train_truth, test_features, classa, classb)
+    else: #linear regression
+      train_classification_result, test_classification_result = LinearRegression(train_features, train_truth, test_features, classa, classb)
     #check to see if either classification is "pure"
     #select the items which are really in class 0
     class_a_samples = train_classification_result[train_truth == classa]
     class_b_samples = train_classification_result[train_truth == classb]
+    print "class_a_train_rate %f"%(np.sum(class_a_samples)/class_a_samples.shape[0])
+    print "class_b_train_rate %f"%(1.0 - np.sum(class_b_samples)/class_b_samples.shape[0])
+    class_a_test_samples = test_classification_result[test_truth == classa]
+    class_b_test_samples = test_classification_result[test_truth == classb]
+    print "class_a_test_rate %f"%(np.sum(class_a_test_samples)/class_a_test_samples.shape[0])
+    print "class_b_test_rate %f"%(1.0 - np.sum(class_b_test_samples)/class_b_test_samples.shape[0])
     #sum errors from every recursion
     num_errors = 0
     if not np.all(class_a_samples == classa) and not np.all(class_a_samples == classb) and not np.all(test_truth[test_classification_result == classa]) and np.any(test_truth[test_classification_result == classa]) and not np.all(train_truth[train_classification_result == classa]) and np.any(train_truth[train_classification_result == classa]):
@@ -39,7 +50,6 @@ def binaryClassify_fisher(train_features, train_truth, test_features, test_truth
         #the sample was "pure" so result results on it
         #compute the number of errors in this dataset
         #check what the previous output was (we only have to check the first element since they are all the same
-        #pdb.set_trace()
         num_errors += np.sum(test_classification_result[test_truth == classa] == classa)
     if not np.all(class_b_samples == classb) and not np.all(class_b_samples == classa) and not np.all(test_truth[test_classification_result == classb]) and np.any(test_truth[test_classification_result == classb]) and not np.all(train_truth[train_classification_result == classb]) and np.any(train_truth[train_classification_result == classb]):
         #recurse on this branch
@@ -53,12 +63,28 @@ def binaryClassify_fisher(train_features, train_truth, test_features, test_truth
         #the sample was "pure" so result results on it
         #compute the number of errors in this dataset
         #check what the previous output was (we only have to check the first element since they are all the same
-        #pdb.set_trace()
         num_errors += np.sum(test_classification_result[test_truth == classb] == classb)
  
     return num_errors
 
+def LinearRegression(train_features, train_truth, test_features, classa, classb):
+     train_truth_internal = np.matrix(train_truth.copy()).T
+     #make classification 0-centered
+     train_truth_internal[train_truth_internal == 0] = -1
+     filter = la.inv(train_features.T * train_features + np.eye(train_features.shape[1])*1e-10)  * train_features.T * train_truth_internal
+     test_classification = (test_features * filter)
+     train_classification = (train_features * filter)
+     test_rtn = test_classification.copy()
+     train_rtn = train_classification.copy()
+     test_rtn[test_classification <= 0] = classa
+     train_rtn[train_classification <= 0] = classa
+     test_rtn[test_classification >0] = classb
+     train_rtn[train_classification >0] = classb
+     return np.array(train_rtn)[:,0],np.array(test_rtn)[:,0]
+
 def FisherClassifier(train_features, train_truth, test_features, classa, classb):
+  with warnings.catch_warnings():
+    warnings.filterwarnings('error')
     '''
     :param features:
     :param classification:
@@ -68,54 +94,73 @@ def FisherClassifier(train_features, train_truth, test_features, classa, classb)
     # separate classes
     class_a_features = train_features[train_truth == classa]
     class_b_features = train_features[train_truth == classb]
-
-    class_a_mean = np.mean(class_a_features, 0).T
-    class_a_cov  = np.cov(class_a_features.T)
-
-    class_b_mean = np.mean(class_b_features, 0).T
-    class_b_cov  = np.cov(class_b_features.T)
-
-    # compute the Fisher criteria projection to one dimension
     try:
-        projection = la.inv(class_a_cov + class_b_cov + np.eye(class_a_cov.shape[0])*10e-15) * (class_a_mean - class_b_mean)
-    except:
-        pdb.set_trace()
-    pdb.set_trace()
-    projection = projection / la.norm(projection)
+      class_a_mean = np.mean(class_a_features, 0).T
+      class_a_cov  = np.cov(class_a_features.T)
 
-    # project all of the data
-    class_a_projection = class_a_features * projection
-    class_b_projection = class_b_features * projection
-
-    class_a_gauss_build = GaussianBuild(class_a_projection)
-    class_b_gauss_build = GaussianBuild(class_b_projection)
-
-    #classify the test data
-    test_classification_result = []
-    for sample in test_features:
+      class_b_mean = np.mean(class_b_features, 0).T
+      class_b_cov  = np.cov(class_b_features.T)
+    except Warning:
+      #there was no covariance computed, so just assign everything to one class
+      if class_b_features.shape[0] < 2:
+        #send eveything to class a
+        return [np.ones(train_features.shape[0])*classa, np.ones(test_features.shape[0])*classa]
+      else:
+        return [np.ones(train_features.shape[0])*classb, np.ones(test_features.shape[0])*classb]
+    # compute the Fisher criteria projection to one dimension
+    element_classified_a = False
+    element_classified_b = False
+    while not element_classified_a or not element_classified_b:
+      if FISHER:
         try:
-            sample_projection = sample * projection
-        except ValueError:
-            pdb.set_trace()
-        class_a_prob = ComputeGaussianProbability(class_a_gauss_build[0], class_a_gauss_build[1], sample_projection)
-        class_b_prob = ComputeGaussianProbability(class_b_gauss_build[0], class_b_gauss_build[1], sample_projection)
-        if class_a_prob > class_b_prob:
-            test_classification_result.append(classa)
-        else:
-            test_classification_result.append(classb)
-    #classify the train data
-    train_classification_result = []
-    for sample in train_features:
-        try:
-            sample_projection = sample * projection
-        except ValueError:
-            pdb.set_trace()
-        class_a_prob = ComputeGaussianProbability(class_a_gauss_build[0], class_a_gauss_build[1], sample_projection)
-        class_b_prob = ComputeGaussianProbability(class_b_gauss_build[0], class_b_gauss_build[1], sample_projection)
-        if class_a_prob > class_b_prob:
-            train_classification_result.append(classa)
-        else:
-            train_classification_result.append(classb)
+          projection = la.inv(class_a_cov + class_b_cov + np.eye(class_a_cov.shape[0])*10e-15) * (class_a_mean - class_b_mean)
+        except:
+          pdb.set_trace()
+      else: #if RANDOM
+        projection = np.matrix(np.zeros(class_a_cov.shape[0]))
+        for idx in range(projection.shape[0]):
+          projection[idx] = random.random()
+        projection = projection.T
+      projection = projection / la.norm(projection)
+      element_classified_a = False
+      element_classified_b = False
+      # project all of the data
+      class_a_projection = class_a_features * projection
+      class_b_projection = class_b_features * projection
+
+      class_a_gauss_build = GaussianBuild(class_a_projection)
+      class_b_gauss_build = GaussianBuild(class_b_projection)
+
+      #classify the test data
+      test_classification_result = []
+      for sample in test_features:
+          try:
+              sample_projection = sample * projection
+          except ValueError:
+              pdb.set_trace()
+          class_a_prob = ComputeGaussianProbability(class_a_gauss_build[0], class_a_gauss_build[1], sample_projection)
+          class_b_prob = ComputeGaussianProbability(class_b_gauss_build[0], class_b_gauss_build[1], sample_projection)
+          if class_a_prob > class_b_prob:
+              test_classification_result.append(classa)
+          else:
+              test_classification_result.append(classb)
+      #classify the train data
+      train_classification_result = []
+      for sample in train_features:
+          try:
+              sample_projection = sample * projection
+          except ValueError:
+              pdb.set_trace()
+          class_a_prob = ComputeGaussianProbability(class_a_gauss_build[0], class_a_gauss_build[1], sample_projection)
+          class_b_prob = ComputeGaussianProbability(class_b_gauss_build[0], class_b_gauss_build[1], sample_projection)
+          if class_a_prob > class_b_prob:
+              train_classification_result.append(classa)
+              element_classified_a = True
+          else:
+              train_classification_result.append(classb)
+              element_classified_b = True
+      if FISHER:
+        break
     return [np.array(train_classification_result).T,np.array(test_classification_result).T]
 
 def GaussianBuild(features):
@@ -126,7 +171,6 @@ def GaussianBuild(features):
     :param class_id: scalar value to find
     :return: [covariance(f x f),mean (f x 1)]
     """
-    #pdb.set_trace()
     #print 'Of ', features.shape, 'Elements, ', features.shape
     cov_mat = np.cov(features.T)
     mean_mat = np.mean(features.T)
@@ -146,7 +190,11 @@ def ComputeGaussianProbability(cov_mat, mean_mat, sample):
     # sample = meanMat
     non_invertible = True
     eye_scale = 0.0
-    cov_mat_inverse = 1.0 / cov_mat
+    try:
+      cov_mat_inverse = 1.0 / cov_mat
+    except Warning:
+      cov_mat_inverse = 1
+      cov_mat = 1
     probability = 1.0 / (np.sqrt(la.norm(2 * np.pi * cov_mat)))
     probability *= np.exp(-0.5 * (sample - mean_mat).T * cov_mat_inverse * (sample - mean_mat))
     return probability
@@ -190,11 +238,15 @@ def main():
             raw_data = file.read()
             # parse data
             train_data = ParseData(raw_data)
-            pdb.set_trace()
             test_truth = train_data[traintest_data==1,-1]
             test_features = np.matrix(np.array(train_data[traintest_data==1,0:-1]))
             train_truth = train_data[traintest_data==0,-1]
             train_features = np.matrix(np.array(train_data[traintest_data==0,0:-1]))
+            #make the data homogeneous
+            homogeneous_col = np.ones([train_features.shape[0],1]);
+            train_features = np.append(train_features, homogeneous_col,axis=1)
+            homogeneous_col = np.ones([test_features.shape[0],1]);
+            test_features = np.append(test_features, homogeneous_col, axis=1)
     try:
         test_features
         train_features
@@ -202,14 +254,14 @@ def main():
         print "You must provide test and training data"
         quit()
     #iteratively call the classifier to build a binary tree until the classification is perfect or a timeout is reached
-    max_iterations = test_features.shape[0]
+    max_iterations = 5000
     #sort the data into test and training sets
     with open(args.traintest_file) as file:
         raw_data = file.read()
         traintest_data = ParseData(raw_data)
         
     num_errors = binaryClassify_fisher(train_features, train_truth, test_features, test_truth, 0, 1, max_iterations)
-    print "Total errors: %d, %% error:%f"%(num_errors,float(num_errors)/test_truth.shape[0])
+    print "Total errors: %d of %d, %% error:%f"%(num_errors,test_truth.shape[0],float(num_errors)/test_truth.shape[0])
 if __name__ == '__main__':
     main()
 
