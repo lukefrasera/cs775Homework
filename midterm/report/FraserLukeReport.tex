@@ -1,0 +1,142 @@
+\documentclass[letterpaper]{article}
+
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage[top=1in, bottom=1in, right=1in, left=1in]{geometry}
+
+\title{Midterm Report}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This report discusses the implementation of a \emph{decision tree} classifier. The decision tree classifier built in this paper is a binary tree classifier. This is to say that the classifiers used only decide whether a sample belongs to either the positive or negative class. A decision tree at each level classifies the data into smaller and smaller groups of data to hopefully improve the overall classification of the base classifier used on its own.
+\end{abstract}
+
+\section{Introduction}
+\subsection{Decision Tree}
+The decision tree is implemented from a base classifier. The classifier is trained on the training set and is then used to the classify the same training set. The resulting classification is then compared against the training set and if there are errors then the data is split into the resulting positive and negative dataset and sent to children nodes to be further classified until no more errors occur in the classification. This is the terminating condition of the recursive decision tree. Algorithm~\ref{alg:decision} shows the method of training the decision tree.
+
+\begin{algorithm}
+\caption{Decision Tree: $Train$ algorithm}
+\label{alg:decision}
+\begin{algorithmic}[1]
+\STATE $samples \leftarrow train\_data$
+\STATE $truth \leftarrow train\_truth$
+\STATE $node.Train(samples, truth)$
+\STATE $result \leftarrow node.Classify(samples)$
+\STATE $error \leftarrow result != truth$
+\STATE $n\_error \leftarrow sum(error[result == 0])$
+\STATE $p\_error \leftarrow sum(error[result == 1])$
+\IF {$n\_error > 0$}
+  \STATE $n\_samples \leftarrow samples[result == 0]$
+  \STATE $n\_truth \leftarrow truth[result == 0]$
+  \STATE $Train(node.left, n\_samples, n\_truth)$
+\ENDIF
+\IF {$p\_error > 0$}
+  \STATE $p\_samples \leftarrow samples[result == 1]$
+  \STATE $p\_truth \leftarrow truth[result == 1]$
+  \STATE $Train(node.right, p\_samples, p\_truth)$
+\ENDIF
+\end{algorithmic}
+\end{algorithm}
+
+$samples$ are all of the training samples in the entire dataset and $truth$ consist of all of the truth data in the entire training set. Algorithm~\ref{alg:decision} trains against all of the samples simultaneously. This improves the runtime of the algorithm as it takes advantage of linear functions in \emph{numpy}. This algorithm is the central algorithm used to train against all three types of classifiers. $node$ represents a single node in the decision tree. A $node$ contains a classifier within it and it points to its child classifiers. A network of $nodes$ is linked together to form the full binary decision tree. 
+
+$result$ is the resulting classification data from the trained $node$. This is used to determine if further splitting is required. When there are miss-classified samples $Train$ is recursively called on the children of the parent $node$. This is how the decision tree branches out to form are larger network.
+
+\begin{algorithm}
+\caption{Decision Tree: $Classify$ algorithm}
+\label{alg:decisionclassify}
+\begin{algorithmic}[1]
+\STATE $samples \leftarrow test\_data$
+\STATE $node \leftarrow root\_node$
+\STATE $result = \leftarrow node.Classify(samples)$
+\IF {$node.left$}
+\STATE $n\_samples \leftarrow samples[result == 0]$
+\STATE $n\_result \leftarrow Classify(node.left, n\_samples)$
+\ENDIF
+\IF {$node.right$}
+\STATE $n\_samples \leftarrow samples[result == 1]$
+\STATE $n\_result \leftarrow Classify(node.right, p\_samples)$
+\ENDIF
+\end{algorithmic}
+\end{algorithm}
+
+In Algorithm~\ref{alg:decisionclassify} the decision tree $Classify$ method is shown. This is the method used to classify on the trained decision tree. $Classify$ is a recursive function that follows the decision to the leaves classifying at each step to determine which branch the sample follows. The leaf node ultimately determines the classification of the sample.
+
+\section{Classifiers}
+Three different decision trees were tested in this assignment:
+\begin{itemize}
+\item logistic regression
+\item fisher discriminant
+\item random cuts
+\end{itemize}
+
+\subsection{Logistic Regression}
+The logistic equation uses least squares to minimize the error of classification estimation. The method is shown in equations~[1-5]
+\begin{equation}
+y = a_0 + a_1 x_1^i + \dots + a_n x_n^i
+\end{equation}
+\begin{equation}
+y = \begin{bmatrix} 1 & x_1^i & x_2^i & \dots & x_n^i \end{bmatrix} * \begin{bmatrix} a_0\\a_1\\ \vdots \\ a_n\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+\vec{y} = \begin{bmatrix} 1 & x_1^1 & x_2^1 & \dots & x_n^1\\
+                     1 & x_1^2 & x_2^2 & \dots & x_n^2\\
+                     \vdots & \vdots & \vdots & \ddots & \vdots \\
+                     1 & x_1^n & x_2^n & \dots & x_n^n\end{bmatrix} * \begin{bmatrix} a_0 \\ a_1 \\ \vdots \\ a_n\end{bmatrix} + \begin{bmatrix} e_1 \\ e_2 \\ \vdots \\ e_n\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+\vec{y} = X\vec{a}
+\end{equation}
+\begin{equation}
+min(E = (\vec{y} - X\vec{a})^T(\vec{y} - X\vec{a}))
+\end{equation}
+
+\begin{enumerate}
+\item Build $X$ and $y$ %todo make vector
+Where $X$ is your features and $y$ is your classification result
+\item Compute $a = (X^TX)^{-1}X^Ty$
+\item Apply Classifier: New data is given $\leftarrow (z^T = [z_1, z_2, \dots,z_n]$
+Compute : $f(z)$
+\item if $f(z) \geq 0, z \in P$ \\ if $f(z) < 0, z \in N$
+\end{enumerate}
+\subsection{Fisher Discriminant}
+Take a problem in a $R^n$ space and transform it into a $R^1$ space. Then you can fit two gaussians that represent the classifications.
+
+Criteria:
+\begin{enumerate}
+\item max separation of means
+\item smallest projected variance
+\end{enumerate}
+
+\begin{equation}
+S(\vec{u}) = \frac{||\vec{a} \vec{\mu}_1 - \vec{a} \vec{\mu}_2||^2}{\vec{a}^T \Sigma_1 \vec{a} + \vec{a}^T \Sigma_2 \vec{a}}
+\end{equation}
+Maximize equation to find a good compromise between the smalles projected variance and the max separation of means.
+
+\begin{equation}
+\vec{a} = c * (\Sigma_1 + \Sigma_2)^{-1} (\vec{\mu}_1 - \vec{\mu}_2)
+\end{equation}
+
+Fisher Classifier:
+\begin{enumerate}
+\item compute: $\Sigma_1, \Sigma_2 | \mu_1, \mu_2$
+\item compute: $\vec{a}$
+\item One dimensional problem
+\item Classify using a Gaussian classifier
+\end{enumerate}
+
+\subsection{Random Slice}
+Random slice is very similar to the method of Fisher discriminant however the projection is defined randomly. Then the problem is classified using a Gaussian classifier.
+
+\section{Results}
+
+\section{Discussion}
+
+\end{document}
