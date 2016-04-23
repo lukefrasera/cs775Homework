@@ -351,7 +351,7 @@ class TwoDGaussian(object):
   def __init__(self, x, y, variance, sign):
     self.x = x
     self.y = y
-    self.mean = np.matrix([[x,y]]).T
+    self.mean = np.matrix([[x,y]])
     self.cov = np.eye(2) * variance
     self.cov_inv = la.inv(self.cov)
     self.sign = sign
@@ -362,8 +362,8 @@ class TwoDGaussian(object):
     
   def __call__(self,sample):
       centeredSample = sample - self.mean
-      dist = self.cov_inv * centeredSample
-      dist = np.multiply(centeredSample,dist)
+      dist = self.cov_inv * centeredSample.T
+      dist = np.multiply(centeredSample.T,dist)
       dist = np.sum(dist,0).T
       return self.sign * self.normalizer * np.exp(- 0.5 * dist)
  ###############################################################################
@@ -372,11 +372,30 @@ class DatasetGenerator(object):
   def __init__(self, gaussians, samples):
     '''gaussians=list of 2dGaussians
        num_samples=the number of points to generate'''
-    self.distances = np.zeros([samples.shape[1],1])
+    self.samples = samples
+    self.distances = np.zeros([samples.shape[0],1])
     for gaussian in gaussians:
       self.distances += gaussian(samples)
-  def __call__(self):
+  def getDistances(self):
     return self.distances
+  def plot_grid(self):
+    #Get the image data and reformat it for matplotlib to graph
+    image = self.distances
+    image = np.reshape(image,[np.sqrt(image.shape[0]),np.sqrt(image.shape[0])])
+    image[image > 0] = 1
+    image[image < 0] = 0
+    plt.figure(2)
+    plt.imshow(image,interpolation='none',cmap='Greys_r')
+    plt.show(block=False)
+  def plot_sparse(self):
+    #plot each point on a plane
+    plt.figure(3)
+    posClass = self.samples[(self.distances > 0).view(np.ndarray).ravel()==1]
+    plt.plot(posClass[:,0],-posClass[:,1],'ro')
+    negClass = self.samples[(self.distances <=0).view(np.ndarray).ravel()==1]
+    plt.plot(negClass[:,0],-negClass[:,1],'bo')
+    plt.show(block=False)
+   
 ################################################################################
 
 class ClassiferTest(object):
@@ -415,23 +434,14 @@ def GenerateTable(results):
 
 def main():
   ''' Test the classes for performance and corrrecness'''
-  #data = CSVInput(sys.argv[1], first_row_titles=False)
-  #truth_training = CSVInput(sys.argv[2], first_row_titles=False)
-  #samples = np.matrix(data.data)
-  #truth = samples[:,-1]
-  #samples = samples[:,:-1]
-
-  #sets = np.array(truth_training.data)
-  #training_samples = samples[sets.T[0] == 0]
-  #trainging_truth = truth[sets.T[0] == 0]
-  #testing_samples = samples[sets.T[0] == 1]
-  #testing_truth = truth[sets.T[0] == 1]
+  #Generate a number of points in 2D, these will be the gaussian centers
   gaussians = []
   num_gaussians = 6
-  parent_variance = 0.05
+  parent_variance = 0.2
   leftX,leftY = np.random.multivariate_normal([0,0.5],[[parent_variance,0],[0,parent_variance]],num_gaussians/2).T
   rightX,rightY = np.random.multivariate_normal([1,0.5],[[parent_variance,0],[0,parent_variance]],num_gaussians/2).T
   
+  #normalize the means so they are in [0,1] in both dimensions
   minx = np.min([leftX,rightX])
   maxx = np.max([leftX,rightX])
   miny = np.min([leftY,rightY])
@@ -440,63 +450,28 @@ def main():
   rightX = (rightX - minx)/(maxx-minx)
   leftY = (leftY - miny)/(maxy-miny)
   rightY = (rightY - miny)/(maxy-miny)
-  #plt.plot(leftX,leftY,'ro')
-  #plt.plot(rightX,rightY,'bo')
-  #plt.show()
+  #create a meshgrid (i.e. a discrete gridding) of the  gaussian field so that we can visualize the boundary between the classes
   imagesize = 1000
-  imgX,imgY = np.meshgrid(np.linspace(0,1,imagesize),np.linspace(0,1,imagesize))
-  imgX = np.reshape(imgX,[1,imagesize*imagesize])
-  imgY = np.reshape(imgY,[1,imagesize*imagesize])
-  img = np.asmatrix(np.concatenate((imgX,imgY)))
+  gridX,gridY = np.meshgrid(np.linspace(0,1,imagesize),np.linspace(0,1,imagesize))
+  gridX = np.reshape(gridX,[1,imagesize*imagesize])
+  gridY = np.reshape(gridY,[1,imagesize*imagesize])
+  grid = np.asmatrix(np.concatenate((gridX,gridY))).T
   
-
+  #build gaussians using the means previousl computed
   for i in range(num_gaussians/2):
     gaussians.append(TwoDGaussian(leftX[i],leftY[i],0.1,1))
     gaussians.append(TwoDGaussian(rightX[i],rightY[i],0.1,-1))
-  #pudb.set_trace()
-  gridData = DatasetGenerator(gaussians,img)
-  image = gridData()
-  image = np.reshape(image,[imagesize,imagesize])
-  image[image > 0] = 1
-  image[image < 0] = 0
-  plt.imshow(image,interpolation='none',cmap='Greys_r')
+  #This function compute the weight of each point in meshgrid. For a discrete grid this is equivalent to building an image of the gaussian field
+  gridData = DatasetGenerator(gaussians,grid)
+  gridData.plot_grid()
+  #generate the actual dataset to classify on
+  num_training_samples = 1000
+  samples = np.random.rand(num_training_samples,2)
+  sampleData = DatasetGenerator(gaussians,samples)
+  sampleData.plot_sparse()
+  #perform the classification
+  
   plt.show()
-  # print samples, samples.shape
-  # print truth, truth.shape
-
-  regression = Regression(0, 1)
-  classify_test = ClassiferTest(regression, (training_samples, trainging_truth))
-  classify_test.Training()
-  classify_test.Testing()
-  classify_test.Results()
-
-  # fisher = Fisher(0, 1)
-  # classify_test = ClassiferTest(fisher, (samples, truth))
-  # classify_test.Training()
-  # classify_test.Testing()
-  # classify_test.Results()
-
-  # random = Random(0, 1)
-  # classify_test = ClassiferTest(random, (samples, truth))
-  # classify_test.Training()
-  # classify_test.Testing()
-  # classify_test.Results()
-  decision_tree = DecisionTree(Regression(0,1), 0,1, max_depth=800)
-  dec_samples, dec_truth = decision_tree.ReformatData(training_samples, trainging_truth)
-  decision_tree.Train(dec_samples, dec_truth)
-  dec_result = decision_tree.Classify(dec_samples)
-  print float(np.sum(dec_result != dec_truth)) / float(dec_result.shape[0])
-  print dec_result.shape
-
-  dec_samples, dec_truth = decision_tree.ReformatData(testing_samples, testing_truth)
-  dec_result = decision_tree.Classify(dec_samples)
-  print float(np.sum(dec_result != dec_truth)) / float(dec_result.shape[0])
-  print dec_result.shape
-
-
-
-  # GraphResults(results)
-  # GenerateTable(results)
-
+  
 if __name__ == '__main__':
   main()
