@@ -9,7 +9,7 @@ import copy
 import warnings
 import random
 import matplotlib.pyplot as plt
-
+import pudb
 class CSVInput:
   def __init__(self, filename, first_row_titles=False, num_convert=True, set_true_false_01=True):
     self.titles = []
@@ -361,21 +361,20 @@ class TwoDGaussian(object):
       self.normalizer = 1.0 / (np.sqrt(2.0 * np.pi * (self.cov + 0.000000001)))
     
   def __call__(self,sample):
-      return self.sign * float(self.normalizer * np.exp(- 0.5 * (sample - self.mean).T * self.cov_inv * (sample - self.mean)))
+      centeredSample = sample - self.mean
+      dist = self.cov_inv * centeredSample
+      dist = np.multiply(centeredSample,dist)
+      dist = np.sum(dist,0).T
+      return self.sign * self.normalizer * np.exp(- 0.5 * dist)
  ###############################################################################
 ################################################################################
 class DatasetGenerator(object):
   def __init__(self, gaussians, samples):
     '''gaussians=list of 2dGaussians
        num_samples=the number of points to generate'''
-    self.distances = []
-    for i in xrange(samples.shape[1]):
-      distance = 0
-      sample = samples[:,i]
-      for gaussian in gaussians:
-        # Compute normalizing term
-        distance += gaussian(sample)
-      self.distances.append(distance)
+    self.distances = np.zeros([samples.shape[1],1])
+    for gaussian in gaussians:
+      self.distances += gaussian(samples)
   def __call__(self):
     return self.distances
 ################################################################################
@@ -416,11 +415,11 @@ def GenerateTable(results):
 
 def main():
   ''' Test the classes for performance and corrrecness'''
-  data = CSVInput(sys.argv[1], first_row_titles=False)
+  #data = CSVInput(sys.argv[1], first_row_titles=False)
   #truth_training = CSVInput(sys.argv[2], first_row_titles=False)
-  samples = np.matrix(data.data)
-  truth = samples[:,-1]
-  samples = samples[:,:-1]
+  #samples = np.matrix(data.data)
+  #truth = samples[:,-1]
+  #samples = samples[:,:-1]
 
   #sets = np.array(truth_training.data)
   #training_samples = samples[sets.T[0] == 0]
@@ -432,6 +431,7 @@ def main():
   parent_variance = 0.05
   leftX,leftY = np.random.multivariate_normal([0,0.5],[[parent_variance,0],[0,parent_variance]],num_gaussians/2).T
   rightX,rightY = np.random.multivariate_normal([1,0.5],[[parent_variance,0],[0,parent_variance]],num_gaussians/2).T
+  
   minx = np.min([leftX,rightX])
   maxx = np.max([leftX,rightX])
   miny = np.min([leftY,rightY])
@@ -443,7 +443,7 @@ def main():
   #plt.plot(leftX,leftY,'ro')
   #plt.plot(rightX,rightY,'bo')
   #plt.show()
-  imagesize = 25
+  imagesize = 1000
   imgX,imgY = np.meshgrid(np.linspace(0,1,imagesize),np.linspace(0,1,imagesize))
   imgX = np.reshape(imgX,[1,imagesize*imagesize])
   imgY = np.reshape(imgY,[1,imagesize*imagesize])
@@ -453,13 +453,14 @@ def main():
   for i in range(num_gaussians/2):
     gaussians.append(TwoDGaussian(leftX[i],leftY[i],0.1,1))
     gaussians.append(TwoDGaussian(rightX[i],rightY[i],0.1,-1))
+  #pudb.set_trace()
   gridData = DatasetGenerator(gaussians,img)
   image = gridData()
   image = np.reshape(image,[imagesize,imagesize])
-  
+  image[image > 0] = 1
+  image[image < 0] = 0
   plt.imshow(image,interpolation='none',cmap='Greys_r')
   plt.show()
-  pdb.set_trace()
   # print samples, samples.shape
   # print truth, truth.shape
 
