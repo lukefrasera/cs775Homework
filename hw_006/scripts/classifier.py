@@ -31,7 +31,7 @@ class CSVInput:
                 except ValueError:
                   value = elem
                   if any(false in value for false in self.boolean_false):
-                    value = 0
+                    value = -1
                   elif any(true in value for true in self.boolean_true):
                     value = 1
               row_list.append(value)
