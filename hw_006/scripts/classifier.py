@@ -89,15 +89,30 @@ class Regression(Classifier):
     return (np.asmatrix(ref_samples), ref_truth)
 
 ################################################################################
+# SVM Utilities
 ################################################################################
+
 def TestKKTConditions(alpha, sample, truth):
   return True
+def GaussianKernel(query, sample):
+  pass
+################################################################################
+################################################################################
 class SVM(object):
-  def __init__(self, classa, classb):
+  def __init__(self, classa, classb, C):
     self.classa = classa
     self.classb = classb
-  def OptimizePoint(alpha1, alpha2, sample1, sample2, truth1, truth2):
-    pass
+    #alphas is an ndarray
+    self.alphas = np.zeros(1)
+    self.support_vectors
+    #the maximum weight
+    self.C = C
+  def Evaluate(self, sample, truth_class):
+    """truth_class is an ndarray"""
+    #result = np.sum(self.alphas*truth_class*GaussianKernel(sample,
+  def OptimizePoint(self, alpha1, alpha2, sample1, sample2, truth1, truth2):
+    if alpha1 < C or alpha1 > 0:
+      #select a second sample
   def Train(self, samples, truth):
     #initialize alpha
     alphas = np.zeros(samples.shape[0])
@@ -110,7 +125,8 @@ class SVM(object):
       for index,alpha in enumerate(alphas):
         #if inspect_all==True this is either the first iteration or we are verifying that we are done, so process every alpha
         #else this is not the first iteration and at least one alpha was changed on the last iteration
-        if inspect_all or not TestKKTConditions(alpha, samples[index,:],truth[index]):
+        if inspect_all :#or not TestKKTConditions(alpha, samples[index,:],truth[index]):
+          #must check the weight of pair to ensure it is not 0 or C
           pair_index = random.random() * samples.shape[0]
           if pair_index == 0:
             pair_index += 1
