@@ -249,6 +249,7 @@ class TwoDGaussian(object):
       return self.sign * self.normalizer * np.exp(- 0.5 * dist)
 ################################################################################
 ################################################################################
+fig_num = 0
 class DatasetGenerator(object):
   def __init__(self, gaussians, samples):
     '''gaussians=list of 2dGaussians
@@ -260,20 +261,29 @@ class DatasetGenerator(object):
   def getDistances(self):
     return self.distances
   def plot_grid(self):
+    global fig_num
     #Get the image data and reformat it for matplotlib to graph
     image = self.distances
     image = np.reshape(image,[np.sqrt(image.shape[0]),np.sqrt(image.shape[0])])
     image[image > 0] = 1
     image[image < 0] = 0
-    plt.figure(2)
+    plt.figure(fig_num)
+    fig_num += 1
     plt.imshow(image,interpolation='none',cmap='Greys_r')
     plt.show(block=False)
-  def plot_sparse(self):
+  def plot_sparse(self, distances = -1):
+    global fig_num
+    try:
+      if distances == -1:
+        distances = self.distances
+    except ValueError:
+      pass
     #plot each point on a plane
-    plt.figure(3)
-    posClass = self.samples[(self.distances > 0).view(np.ndarray).ravel()==1]
+    plt.figure(fig_num)
+    fig_num += 1
+    posClass = self.samples[(distances > 0).view(np.ndarray).ravel()==1]
     plt.plot(posClass[:,0],-posClass[:,1],'ro')
-    negClass = self.samples[(self.distances <=0).view(np.ndarray).ravel()==1]
+    negClass = self.samples[(distances <=0).view(np.ndarray).ravel()==1]
     plt.plot(negClass[:,0],-negClass[:,1],'bo')
     plt.show(block=False)
   def GetTruth(self):
@@ -317,9 +327,9 @@ def main():
     gaussians.append(TwoDGaussian(rightX[i],rightY[i],0.1,-1))
   #This function compute the weight of each point in meshgrid. For a discrete grid this is equivalent to building an image of the gaussian field
   gridData = DatasetGenerator(gaussians,grid)
-  #gridData.plot_grid()
+  gridData.plot_grid()
   #generate the actual dataset to classify on
-  num_training_samples = 25
+  num_training_samples = 100
   train_samples = np.random.rand(num_training_samples,2)
   train_sample_data = DatasetGenerator(gaussians,train_samples)
   train_samples = np.concatenate((train_samples, np.ones((train_samples.shape[0], 1))), axis=1)
@@ -327,7 +337,7 @@ def main():
   num_test_samples = 100
   test_samples = np.random.rand(num_test_samples,2)
   test_sample_data = DatasetGenerator(gaussians,test_samples)
-  #sampleData.plot_sparse()
+  train_sample_data.plot_sparse()
   #perform the classification
   start = time.time()
   svm = SVM(100)
@@ -337,6 +347,8 @@ def main():
   num_errors = np.sum(diff!=0)
   print('Num errors: '+str(num_errors)+' '+str(float(num_errors)/num_training_samples))
   print time.time()-start
+  #plot the classification results
+  train_sample_data.plot_sparse(train_classification)
   plt.show()
   print svm.alphas
   
