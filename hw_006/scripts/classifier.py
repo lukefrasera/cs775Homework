@@ -234,8 +234,8 @@ class SVM(object):
       #loop over all the points which don't satisfy the Karush-Kahn-Tucker conditions
       #print("0000/0000")
       for index,alpha in enumerate(self.alphas):
-        #print(str(index)+"/"+str(self.alphas.shape[0]))
-        #if inspect_all==True this is either the first iteration or we are verifying that we are done, so process every alpha
+        # print(str(index)+"/"+str(self.alphas.shape[0]))
+
         #else this is not the first iteration and at least one alpha was changed on the last iteration
         sample = samples[index]
         sample_truth = truth[index]
