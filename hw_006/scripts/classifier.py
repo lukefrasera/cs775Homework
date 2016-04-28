@@ -264,13 +264,12 @@ class DatasetGenerator(object):
     global fig_num
     #Get the image data and reformat it for matplotlib to graph
     image = self.distances
-    image = np.reshape(image,[np.sqrt(image.shape[0]),np.sqrt(image.shape[0])])
+    image = np.reshape(image,[int(np.sqrt(image.shape[0])),int(np.sqrt(image.shape[0]))])
     image[image > 0] = 1
     image[image < 0] = 0
-    plt.figure(fig_num)
     fig_num += 1
     plt.imshow(image,interpolation='none',cmap='Greys_r')
-    plt.show(block=False)
+    # plt.show(block=False)
   def plot_sparse(self, distances = -1):
     global fig_num
     try:
@@ -279,19 +278,34 @@ class DatasetGenerator(object):
     except ValueError:
       pass
     #plot each point on a plane
-    plt.figure(fig_num)
-    fig_num += 1
-    posClass = self.samples[(distances > 0).view(np.ndarray).ravel()==1]
-    plt.plot(posClass[:,0],-posClass[:,1],'ro')
-    negClass = self.samples[(distances <=0).view(np.ndarray).ravel()==1]
-    plt.plot(negClass[:,0],-negClass[:,1],'bo')
-    plt.show(block=False)
+    # plt.figure(fig_num)
+    # fig_num += 1
+    # posClass = self.samples[(distances > 0).view(np.ndarray).ravel()==1]
+    # plt.plot(posClass[:,0],-posClass[:,1],'ro')
+
+    x = self.samples[distances.ravel() > 0][:,0] * 1000
+    y = self.samples[distances.ravel() > 0][:,1] * 1000
+    plt.scatter(x, y, c='yellow')
+
+    x = self.samples[distances.ravel() <= 0][:,0] * 1000
+    y = self.samples[distances.ravel() <= 0][:,1] * 1000
+    plt.scatter(x, y, c='red')
+
+    # negClass = self.samples[(distances <=0).view(np.ndarray).ravel()==1]
+    # plt.plot(negClass[:,0],-negClass[:,1],'bo')
   def GetTruth(self):
     truth = self.distances
     truth[truth > 0] = 1
     truth[truth <= 0] = -1
     return truth
-   
+
+
+def Plot_Output(points, result):
+  image = result
+  image = np.reshape(image,[int(np.sqrt(image.shape[0])),int(np.sqrt(image.shape[0]))])
+  image[image > 0] = 0
+  image[image < 0] = 1
+  plt.imshow(image,interpolation='none',cmap=plt.get_cmap('viridis'), extent=[0, 1000, 1000, 0], alpha=.3)
 ################################################################################
 ################################################################################
 
@@ -300,8 +314,8 @@ def main():
   #Generate a number of points in 2D, these will be the gaussian centers
   np.random.seed(1)
   gaussians = []
-  num_gaussians = 6
-  parent_variance = 0.2
+  num_gaussians = 4
+  parent_variance = 0.7
   leftX,leftY = np.random.multivariate_normal([0,0.5],[[parent_variance,0],[0,parent_variance]],num_gaussians/2).T
   rightX,rightY = np.random.multivariate_normal([1,0.5],[[parent_variance,0],[0,parent_variance]],num_gaussians/2).T
   
@@ -334,23 +348,42 @@ def main():
   train_sample_data = DatasetGenerator(gaussians,train_samples)
   train_samples = np.concatenate((train_samples, np.ones((train_samples.shape[0], 1))), axis=1)
 
-  num_test_samples = 100
+  num_test_samples = 1000
   test_samples = np.random.rand(num_test_samples,2)
   test_sample_data = DatasetGenerator(gaussians,test_samples)
   train_sample_data.plot_sparse()
+  plt.title("Training Set")
+  plt.show()
   #perform the classification
   start = time.time()
-  svm = SVM(100)
+  svm = SVM(150)
   svm.Train(train_samples, train_sample_data.GetTruth())
   train_classification = svm.Classify(train_samples)
   diff = train_classification - np.array(train_sample_data.GetTruth().T[0])
   num_errors = np.sum(diff!=0)
-  print('Num errors: '+str(num_errors)+' '+str(float(num_errors)/num_training_samples))
   print time.time()-start
   #plot the classification results
+
+
+  imagesize = 100
+  gridX,gridY = np.meshgrid(np.linspace(0,1,imagesize),np.linspace(0,1,imagesize))
+  gridX = np.reshape(gridX,[1,imagesize*imagesize])
+  gridY = np.reshape(gridY,[1,imagesize*imagesize])
+  grid = np.asmatrix(np.concatenate((gridX,gridY))).T
+  grid_classify = svm.Classify(np.concatenate((grid, np.ones((grid.shape[0],1))), axis=1))
+
+  fig = plt.figure(frameon=False)
+  plt.hold(True)
+  gridData.plot_grid()
   train_sample_data.plot_sparse(train_classification)
+  Plot_Output(grid, grid_classify)
+  plt.title("Train Set")
+  print "Num of test samples: %d" % (num_training_samples)
+  print "Num training samples: %d" % (num_test_samples)
+  print('Num errors: '+str(num_errors)+' '+str(float(num_errors)/num_training_samples))
+  print "Num Alphas %d" % (np.sum(svm.alphas > 0))
+  print "C          %f" % (svm.C)
   plt.show()
-  print svm.alphas
   
 if __name__ == '__main__':
   main()
