@@ -183,8 +183,12 @@ class SVM(object):
       elif a2 > H:
         a2 = H
     else:
-      Lobj = self.Evaluate()
-      Hobj = None
+      temp_alphas = self.alphas
+      self.alphas[second_index] = L
+      Lobj = self.EvaluateObjFunc(second_index, samples, truth)
+      self.alphas[second_index] = H
+      Hobj = self.EvaluateObjFunc(second_index, samples, truth
+      self.alphas = temp_alphas
       if Lobj < Hobj + np.finfo(np.float).eps:
         a2 = L
       elif Lobj > Hobj + np.finfo(np.float).eps:
@@ -205,7 +209,7 @@ class SVM(object):
     #select a second sample which doesn't meet the KKT conditions
     second_index = self.FindNonKKTSample(samples, truth, sample_index)
     if second_index != -1:
-      if self.TakeStep(samples, truth, sample_index, second_index):
+      if self.TakeStep(samples, truth, second_index, sample_index):
         return 1
     for second_sample_index, alpha in enumerate(self.alphas):
       #print("In second loop")
