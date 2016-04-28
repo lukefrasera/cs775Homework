@@ -342,10 +342,10 @@ def main():
   gridData = DatasetGenerator(gaussians,grid)
   #gridData.plot_grid()
   #generate the actual dataset to classify on
-  num_training_samples = 20
+  num_training_samples = 50
   train_samples = np.random.rand(num_training_samples,2)
   train_sample_data = DatasetGenerator(gaussians,train_samples)
-  num_test_samples = 20
+  num_test_samples = 1000
   test_samples = np.random.rand(num_test_samples,2)
   test_sample_data = DatasetGenerator(gaussians,test_samples)
   #sampleData.plot_sparse()
@@ -355,7 +355,8 @@ def main():
   test_classification = svm.Classify(test_samples)
   diff = test_classification - np.array(test_sample_data.GetTruth().T[0])
   num_errors = np.sum(diff!=0)
-  pudb.set_trace()
+  print('Num errors: '+str(num_errors)+' '+str(float(num_errors)/num_test_samples))
+  #pudb.set_trace()
   plt.show()
   
 if __name__ == '__main__':
