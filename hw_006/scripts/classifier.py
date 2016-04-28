@@ -100,12 +100,15 @@ def MeetsKKTConditions(C, alpha, sample, truth, output):
   if alpha == C and (truth * output > 1):
     return False
   return True
-def GaussianKernel(query, sample, cov):
+def GaussianKernel(query, samples, cov):
   query = np.matrix(query)
-  samples = np.matrix(sample)
+  samples = np.matrix(samples)
   cov_inv = la.inv(cov)
+  dist = cov_inv * (query - samples).T
+  dist = np.multiply((query - samples).T,dist)
+  dist = np.sum(dist,0).T
   normalizer = 1.0 / (np.sqrt(la.det(2.0 * np.pi * cov)))
-  return normalizer * np.exp(- 0.5 * (sample - query) * cov_inv * (sample - query).T)
+  return normalizer * np.exp(-0.5 * dist)
 ################################################################################
 ################################################################################
 class SVM(object):
@@ -132,9 +135,10 @@ class SVM(object):
     """truth_class is an ndarray"""
     variance = np.matrix([[1,0],[0,1]])
     the_sum = 0
-    for i in range(samples.shape[0]):
-      the_sum += self.alphas[i]*truth_class[i]*GaussianKernel(query,samples[i], variance)
-    return np.sign(the_sum)
+    truth_class = truth_class.T[0]
+    #pudb.set_trace()
+    return np.sign(self.alphas*truth_class*GaussianKernel(query,samples, variance))
+    #return np.sign(self.alphas[i]*truth_class[i]*GaussianKernel(query,samples[i], variance))
   def EvaluateObjFunc(self, sample_index, samples, truth):
     alpha_sum = 0
     for alpha in self.alphas:
