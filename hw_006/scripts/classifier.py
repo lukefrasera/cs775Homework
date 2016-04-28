@@ -147,8 +147,7 @@ class SVM(object):
 
     right_sum = 0
     for ai,truthi,samplei in zip(self.alphas,truth,samples):   
-      for aj,truthj, samplej in zip(self.alphas, truth, samples):
-        right_sum += ai*aj*truthi*truthj*GaussianKernel(samplei,samplej, np.eye(3))
+      right_sum += np.sum(ai*np.asarray(self.alphas)*(truthi*np.asarray(truth)*np.asarray(GaussianKernel(samplei,samples, np.eye(3)))).T[0])
     return alpha_sum - 0.5 * right_sum
   def TakeStep(self, samples, truth, first_index, second_index):
     if first_index == second_index:
@@ -176,7 +175,7 @@ class SVM(object):
     k12 = GaussianKernel(sample1,sample2, covariance)
     k22 = GaussianKernel(sample2,sample2, covariance)
     eta = k11 + k22 - 2 * k12
-    if eta < 0: 
+    if eta >= 0: 
       a2 = alpha2 + truth2 * (error1-error2)/eta
       if a2 < L:
         a2 = L
@@ -186,10 +185,8 @@ class SVM(object):
       temp_alphas = self.alphas
       self.alphas[second_index] = L
       Lobj = self.EvaluateObjFunc(second_index, samples, truth)
-      print Lobj
       self.alphas[second_index] = H
       Hobj = self.EvaluateObjFunc(second_index, samples, truth)
-      print Hobj
       self.alphas = temp_alphas
       if Lobj < Hobj + np.finfo(np.float).eps:
         a2 = L
@@ -200,7 +197,7 @@ class SVM(object):
     if a2 < 1e-8:
       a2 = 0
     elif a2 > self.C-1e-8:
-      a2 = C
+      a2 = self.C
     if np.abs(a2-alpha2) < np.finfo(np.float).eps * (a2 + alpha2 + np.finfo(np.float).eps):
       return False
     a1 = alpha1 + s * (alpha2 - a2)
@@ -379,6 +376,7 @@ def main():
   #pudb.set_trace()
   print time.time()-start
   plt.show()
+  print svm.alphas
   
 if __name__ == '__main__':
   main()
