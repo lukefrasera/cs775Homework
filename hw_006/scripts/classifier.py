@@ -102,11 +102,11 @@ class SVM(object):
     return -1
   def Evaluate(self, query, samples, truth_class):
     """truth_class is an ndarray"""
-    variance = np.eye(3)
+    variance = np.eye(3) * 0.1
     the_sum = 0
     truth_class = truth_class.T[0]
-    #pudb.set_trace()
-    result = np.sign(self.alphas*truth_class*GaussianKernel(query,samples, variance))
+
+    result = np.sign(np.asmatrix(self.alphas*truth_class)*GaussianKernel(query,samples, variance))
     if result == 0:
       result = 1
     return result
@@ -118,7 +118,7 @@ class SVM(object):
 
     right_sum = 0
     for ai,truthi,samplei in zip(self.alphas,truth,samples):   
-      right_sum += np.sum(ai*np.asarray(self.alphas)*(truthi*np.asarray(truth)*np.asarray(GaussianKernel(samplei,samples, np.eye(3)))).T[0])
+      right_sum += np.sum(ai*np.asarray(self.alphas)*(truthi*np.asarray(truth)*np.asarray(GaussianKernel(samplei,samples, np.eye(3) * 0.1))).T[0])
     return alpha_sum - 0.5 * right_sum
   def TakeStep(self, samples, truth, first_index, second_index):
     if first_index == second_index:
@@ -140,7 +140,7 @@ class SVM(object):
       H = min(self.C, alpha1 + alpha2)
     if L == H:
       return False
-    covariance = np.eye(3)
+    covariance = np.eye(3) * .1
     k11 = GaussianKernel(sample1,sample1, covariance)
     k12 = GaussianKernel(sample1,sample2, covariance)
     k22 = GaussianKernel(sample2,sample2, covariance)
@@ -301,7 +301,7 @@ class DatasetGenerator(object):
 
 
 def Plot_Output(points, result):
-  image = result
+  image = result.copy()
   image = np.reshape(image,[int(np.sqrt(image.shape[0])),int(np.sqrt(image.shape[0]))])
   image[image > 0] = 0
   image[image < 0] = 1
@@ -311,11 +311,15 @@ def Plot_Output(points, result):
 
 def main():
   ''' Test the classes for performance and corrrecness'''
+
+  c_input = int(sys.argv[1])
+  train_size = int(sys.argv[2])
+
   #Generate a number of points in 2D, these will be the gaussian centers
-  np.random.seed(1)
+  np.random.seed(2)
   gaussians = []
-  num_gaussians = 4
-  parent_variance = 0.7
+  num_gaussians = 5
+  parent_variance = 0.9
   leftX,leftY = np.random.multivariate_normal([0,0.5],[[parent_variance,0],[0,parent_variance]],num_gaussians/2).T
   rightX,rightY = np.random.multivariate_normal([1,0.5],[[parent_variance,0],[0,parent_variance]],num_gaussians/2).T
   
@@ -343,7 +347,7 @@ def main():
   gridData = DatasetGenerator(gaussians,grid)
   gridData.plot_grid()
   #generate the actual dataset to classify on
-  num_training_samples = 100
+  num_training_samples = train_size
   train_samples = np.random.rand(num_training_samples,2)
   train_sample_data = DatasetGenerator(gaussians,train_samples)
   train_samples = np.concatenate((train_samples, np.ones((train_samples.shape[0], 1))), axis=1)
@@ -351,16 +355,22 @@ def main():
   num_test_samples = 1000
   test_samples = np.random.rand(num_test_samples,2)
   test_sample_data = DatasetGenerator(gaussians,test_samples)
+  test_samples = np.concatenate((test_samples, np.ones((test_samples.shape[0], 1))), axis=1)
+
   train_sample_data.plot_sparse()
   plt.title("Training Set")
-  plt.show()
+  plt.savefig('training_set_c_%d_t_%d.png' %(c_input, train_size))
   #perform the classification
   start = time.time()
-  svm = SVM(150)
+  svm = SVM(c_input)
   svm.Train(train_samples, train_sample_data.GetTruth())
   train_classification = svm.Classify(train_samples)
   diff = train_classification - np.array(train_sample_data.GetTruth().T[0])
-  num_errors = np.sum(diff!=0)
+  num_errors_train = np.sum(diff!=0)
+
+  test_classification = svm.Classify(test_samples)
+  diff = test_classification - np.array(test_sample_data.GetTruth().T[0])
+  num_errors_test = np.sum(diff!=0)
   print time.time()-start
   #plot the classification results
 
@@ -370,7 +380,16 @@ def main():
   gridX = np.reshape(gridX,[1,imagesize*imagesize])
   gridY = np.reshape(gridY,[1,imagesize*imagesize])
   grid = np.asmatrix(np.concatenate((gridX,gridY))).T
+
+
   grid_classify = svm.Classify(np.concatenate((grid, np.ones((grid.shape[0],1))), axis=1))
+  print "Num of test samples: %d" % (num_test_samples)
+  print "Num training samples: %d" % (num_training_samples)
+  print('Num errors Training: '+str(num_errors_train)+' '+str(float(num_errors_train)/num_training_samples))
+  print('Num errors Test    : '+str(num_errors_test)+' '+str(float(num_errors_test)/num_test_samples))
+  print "Num Alphas %d" % (np.sum(svm.alphas > 0))
+  print "C          %f" % (svm.C)
+  print "Alphas: ", svm.alphas
 
   fig = plt.figure(frameon=False)
   plt.hold(True)
@@ -378,12 +397,17 @@ def main():
   train_sample_data.plot_sparse(train_classification)
   Plot_Output(grid, grid_classify)
   plt.title("Train Set")
-  print "Num of test samples: %d" % (num_training_samples)
-  print "Num training samples: %d" % (num_test_samples)
-  print('Num errors: '+str(num_errors)+' '+str(float(num_errors)/num_training_samples))
-  print "Num Alphas %d" % (np.sum(svm.alphas > 0))
-  print "C          %f" % (svm.C)
-  plt.show()
+  plt.savefig('Class_train_set_c_%d_t_%d.png' %(c_input, train_size))
+  plt.hold(False)
+
+  # fig = plt.figure(frameon=False)
+  plt.hold(True)
+  gridData.plot_grid()
+  test_sample_data.plot_sparse(test_classification)
+  Plot_Output(grid, grid_classify)
+  plt.title("Test Set")
+  plt.savefig('class_test_set_c_%d_t_%d.png' %(c_input, train_size))
+
   
 if __name__ == '__main__':
   main()
