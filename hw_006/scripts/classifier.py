@@ -231,12 +231,12 @@ class SVM(object):
       print("0000/0000")
       for index,alpha in enumerate(self.alphas):
         print(str(index)+"/"+str(self.alphas.shape[0]))
-        #if inspect_all==True this is either the first iteration or we are verifying that we are done, so process every alpha
+        # if inspect_all==True this is either the first iteration or we are verifying that we are done, so process every alpha
         #else this is not the first iteration and at least one alpha was changed on the last iteration
-      sample = samples[index]
-      sample_truth = truth[index]
-      output = self.Evaluate(sample, samples, truth)
-      if inspect_all or not MeetsKKTConditions(self.C, alpha, sample, sample_truth, output,):
+        sample = samples[index]
+        sample_truth = truth[index]
+        output = self.Evaluate(sample, samples, truth)
+        if inspect_all or not MeetsKKTConditions(self.C, alpha, sample, sample_truth, output,):
           
           num_alphas_changed += self.OptimizePoint(samples, truth, index)
       if inspect_all:
