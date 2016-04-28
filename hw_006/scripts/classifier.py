@@ -175,7 +175,7 @@ class SVM(object):
     k12 = GaussianKernel(sample1,sample2, covariance)
     k22 = GaussianKernel(sample2,sample2, covariance)
     eta = k11 + k22 - 2 * k12
-    if eta >= 0: 
+    if eta > 0: 
       a2 = alpha2 + truth2 * (error1-error2)/eta
       if a2 < L:
         a2 = L
