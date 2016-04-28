@@ -94,13 +94,18 @@ class Regression(Classifier):
 
 def MeetsKKTConditions(C, alpha, sample, truth, output):
   if alpha == 0 and (truth * output < 1):
-    return false
+    return False
   if 0 < alpha < C and (truth * output != 1):
-    return false
+    return False
   if alpha == C and (truth * output > 1):
-    return false
-def GaussianKernel(query, sample):
-  pass
+    return False
+  return True
+def GaussianKernel(query, sample, cov):
+  query = np.matrix(query)
+  samples = np.matrix(sample)
+  cov_inv = la.inv(cov)
+  normalizer = 1.0 / (np.sqrt(la.det(2.0 * np.pi * cov)))
+  return normalizer * np.exp(- 0.5 * (sample - query) * cov_inv * (sample - query).T)
 ################################################################################
 ################################################################################
 class SVM(object):
@@ -109,22 +114,27 @@ class SVM(object):
     self.alphas = np.zeros(1)
     #the maximum weight
     self.C = C
-  def FindNonKKTSample(self, samples, truth):
+  def FindNonKKTSample(self, samples, truth, blacklist_index):
     num_samples = samples.shape[0]
     start_index = int(np.floor(random.random() * num_samples) - 1)
     for i in range(start_index,start_index+num_samples):
       sample_index = i % num_samples
+      if sample_index == blacklist_index:
+        continue
       sample = samples[sample_index]
       alpha = self.alphas[sample_index]
-      truth = truth[sample_index]
+      sample_truth = truth[sample_index]
       output =  self.Evaluate(sample, samples, truth)
-      if not MeetsKKTConditions(alpha,sample,truth,output):
+      if not MeetsKKTConditions(self.C, alpha,sample,sample_truth,output):
         return sample_index
     return -1
   def Evaluate(self, query, samples, truth_class):
     """truth_class is an ndarray"""
-    result = np.sum(self.alphas*truth_class*GaussianKernel(query,samples))
-    return result
+    variance = np.matrix([[1,0],[0,1]])
+    the_sum = 0
+    for i in range(samples.shape[0]):
+      the_sum += self.alphas[i]*truth_class[i]*GaussianKernel(query,samples[i], variance)
+    return np.sign(the_sum)
   def EvaluateObjFunc(self, sample_index, samples, truth):
     alpha_sum = 0
     for alpha in self.alphas:
@@ -139,24 +149,27 @@ class SVM(object):
     if first_index == second_index:
       raise ValueError("I thought I handled this case")
     alpha1 = self.alphas[first_index]
+    alpha2 = self.alphas[second_index]
     truth1 = truth[first_index]
     truth2 = truth[second_index]
     sample1 = samples[first_index]
     sample2 = samples[second_index]
-    error1 = self.Evaluate(sample1, samples, truth1)
-    error2 = self.Evaluate(sample2, samples, truth2)
+    error1 = self.Evaluate(sample1, samples, truth)
+    error2 = self.Evaluate(sample2, samples, truth)
     s = truth1 * truth2
+    #pudb.set_trace()
     if truth1 != truth2:
       L = max(0, alpha2 - alpha1)
       H = min(self.C, self.C + alpha2 - alpha1)
     else:
-      L = max(0, alpha1 + alpha2 - C)
-      H = min(C, alpha1 + alpha2)
+      L = max(0, alpha1 + alpha2 - self.C)
+      H = min(self.C, alpha1 + alpha2)
     if L == H:
       return False
-    k11 = GaussianKernel(sample1,sample1)
-    k12 = GaussianKernel(sample1,sample2)
-    k22 = GaussianKernel(sample2,sample2)
+    covariance = np.matrix([[1,0],[0,1]])
+    k11 = GaussianKernel(sample1,sample1, covariance)
+    k12 = GaussianKernel(sample1,sample2, covariance)
+    k22 = GaussianKernel(sample2,sample2, covariance)
     eta = k11 + k22 - 2 * k12
     if eta > 0: 
       a2 = alpha2 + truth2 * (error1-error2)/eta
@@ -183,34 +196,47 @@ class SVM(object):
     # Update weight vector to reflect change in a1 & a2, if SVM is linear
   def OptimizePoint(self, samples, truth, sample_index):
     #select a second sample which doesn't meet the KKT conditions
-    pudb.set_trace()
-    second_index = self.FindNonKKTSample(samples, truth)
+    second_index = self.FindNonKKTSample(samples, truth, sample_index)
     if second_index != -1:
       if self.TakeStep(samples, truth, sample_index, second_index):
         return 1
     for second_sample_index, alpha in enumerate(self.alphas):
-      if alpha > 0 and alpha < self.C:
+      print("In second loop")
+      if second_sample_index != sample_index and alpha > 0 and alpha < self.C:
         if self.TakeStep(samples, truth, sample_index, second_sample_index):
           return 1
     num_samples = samples.shape[0]
-    start_point = random.random() * num_samples - 1
+    start_point = int(np.floor(random.random() * num_samples - 1))
     for i in range(start_point, start_point + num_samples):
+      print("In third loop")
       second_sample_index = i % num_samples
-      if self.TakeStep(samples, truth, sample_index, second_sample_index):
+      if second_sample_index != sample_index and self.TakeStep(samples, truth, sample_index, second_sample_index):
         return 1
+    return 0
   def Train(self, samples, truth):
     #initialize alpha
-    self.alphas = np.zeros(samples.shape[0])
+    self.alphas = np.ones(samples.shape[0])
+    self.truths = truth
+    self.samples = samples
     #loop through all the alpha weights
     num_alphas_changed = 0
     inspect_all = True
+    iterations = 0
     while num_alphas_changed > 0 or inspect_all:
+      iterations += 1
+      if iterations % 1 == 0:
+        print("Iteration: "+str(iterations))
       num_alphas_changed = 0
       #loop over all the points which don't satisfy the Karush-Kahn-Tucker conditions
+      print("0000/0000")
       for index,alpha in enumerate(self.alphas):
+        print(str(index)+"/"+str(self.alphas.shape[0]))
         #if inspect_all==True this is either the first iteration or we are verifying that we are done, so process every alpha
         #else this is not the first iteration and at least one alpha was changed on the last iteration
-        if inspect_all or not MeetKKTConditions(alpha, samples[index,:],truth[index]):
+      sample = samples[index]
+      sample_truth = truth[index]
+      output = self.Evaluate(sample, samples, truth)
+      if inspect_all or not MeetsKKTConditions(self.C, alpha, sample, sample_truth, output,):
           
           num_alphas_changed += self.OptimizePoint(samples, truth, index)
       if inspect_all:
@@ -218,7 +244,10 @@ class SVM(object):
       elif num_alphas_changed == 0:
         inspect_all = True
   def Classify(self, samples):
-    pass
+    result = np.ndarray([samples.shape[0]])
+    for i,sample in enumerate(samples):
+      result[i] = self.Evaluate(sample, self.samples, self.truths)
+    return result
   def ReformatData(self, samples, truth):
     pass
 ################################################################################
@@ -311,15 +340,22 @@ def main():
     gaussians.append(TwoDGaussian(rightX[i],rightY[i],0.1,-1))
   #This function compute the weight of each point in meshgrid. For a discrete grid this is equivalent to building an image of the gaussian field
   gridData = DatasetGenerator(gaussians,grid)
-  gridData.plot_grid()
+  #gridData.plot_grid()
   #generate the actual dataset to classify on
-  num_training_samples = 1000
-  samples = np.random.rand(num_training_samples,2)
-  sampleData = DatasetGenerator(gaussians,samples)
-  sampleData.plot_sparse()
+  num_training_samples = 20
+  train_samples = np.random.rand(num_training_samples,2)
+  train_sample_data = DatasetGenerator(gaussians,train_samples)
+  num_test_samples = 20
+  test_samples = np.random.rand(num_test_samples,2)
+  test_sample_data = DatasetGenerator(gaussians,test_samples)
+  #sampleData.plot_sparse()
   #perform the classification
-  svm = SVM(1)
-  svm.Train(samples, sampleData.GetTruth())
+  svm = SVM(2)
+  svm.Train(train_samples, train_sample_data.GetTruth())
+  test_classification = svm.Classify(test_samples)
+  diff = test_classification - np.array(test_sample_data.GetTruth().T[0])
+  num_errors = np.sum(diff!=0)
+  pudb.set_trace()
   plt.show()
   
 if __name__ == '__main__':
