@@ -101,9 +101,10 @@ def MeetsKKTConditions(C, alpha, sample, truth, output):
     return False
   return True
 def GaussianKernel(query, samples, cov):
-  query = np.matrix(query)
-  samples = np.matrix(samples)
+  query = np.asmatrix(query)
+  samples = np.asmatrix(samples)
   cov_inv = la.inv(cov)
+
   dist = cov_inv * (query - samples).T
   dist = np.multiply((query - samples).T,dist)
   dist = np.sum(dist,0).T
@@ -133,7 +134,7 @@ class SVM(object):
     return -1
   def Evaluate(self, query, samples, truth_class):
     """truth_class is an ndarray"""
-    variance = np.matrix([[1,0],[0,1]])
+    variance = np.eye(3)
     the_sum = 0
     truth_class = truth_class.T[0]
     #pudb.set_trace()
@@ -170,7 +171,7 @@ class SVM(object):
       H = min(self.C, alpha1 + alpha2)
     if L == H:
       return False
-    covariance = np.matrix([[1,0],[0,1]])
+    covariance = np.eye(3)
     k11 = GaussianKernel(sample1,sample1, covariance)
     k12 = GaussianKernel(sample1,sample2, covariance)
     k22 = GaussianKernel(sample2,sample2, covariance)
@@ -190,11 +191,13 @@ class SVM(object):
         a2 = H
       else:
         a2 = alpha2
+
     if np.abs(a2-alpha2) < np.finfo(np.float).eps * (a2 + alpha2 + np.finfo(np.float).eps):
       return False
     a1 = alpha1 + s * (alpha2 - a2)
     self.alphas[first_index] = a1
     self.alphas[second_index] = a2
+    print a1
     return True
     # Update threshold to reflect change in Lagrange multipliers
     # Update weight vector to reflect change in a1 & a2, if SVM is linear
@@ -219,7 +222,7 @@ class SVM(object):
     return 0
   def Train(self, samples, truth):
     #initialize alpha
-    self.alphas = np.ones(samples.shape[0])
+    self.alphas = np.zeros(samples.shape[0])
     self.truths = truth
     self.samples = samples
     #loop through all the alpha weights
@@ -360,6 +363,7 @@ def main():
   start = time.time()
   svm = SVM(1000)
   svm.Train(train_samples, train_sample_data.GetTruth())
+  # pudb.set_trace()
   train_classification = svm.Classify(train_samples)
   diff = train_classification - np.array(train_sample_data.GetTruth().T[0])
   num_errors = np.sum(diff!=0)
