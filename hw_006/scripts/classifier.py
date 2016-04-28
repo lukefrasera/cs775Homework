@@ -194,6 +194,10 @@ class SVM(object):
         a2 = H
       else:
         a2 = alpha2
+    if a2 < 1e-8:
+      a2 = 0
+    elif a2 > self.C-1e-8:
+      a2 = C
     if np.abs(a2-alpha2) < np.finfo(np.float).eps * (a2 + alpha2 + np.finfo(np.float).eps):
       return False
     a1 = alpha1 + s * (alpha2 - a2)
