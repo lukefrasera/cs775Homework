@@ -346,6 +346,8 @@ def main():
   num_training_samples = 25
   train_samples = np.random.rand(num_training_samples,2)
   train_sample_data = DatasetGenerator(gaussians,train_samples)
+  train_samples = np.concatenate((train_samples, np.ones((train_samples.shape[0], 1))), axis=1)
+
   num_test_samples = 100
   test_samples = np.random.rand(num_test_samples,2)
   test_sample_data = DatasetGenerator(gaussians,test_samples)
