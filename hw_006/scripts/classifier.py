@@ -316,7 +316,7 @@ def main():
   train_size = int(sys.argv[2])
 
   #Generate a number of points in 2D, these will be the gaussian centers
-  np.random.seed(2)
+  np.random.seed(3)
   gaussians = []
   num_gaussians = 5
   parent_variance = 0.9
