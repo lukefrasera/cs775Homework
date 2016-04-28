@@ -148,7 +148,7 @@ class SVM(object):
     right_sum = 0
     for ai,truthi,samplei in zip(self.alphas,truth,samples):   
       for aj,truthj, samplej in zip(self.alphas, truth, samples):
-        right_sum += ai*aj*truthi*truthj*GaussianKernel(samplei,samplej)
+        right_sum += ai*aj*truthi*truthj*GaussianKernel(samplei,samplej, np.eye(3))
     return alpha_sum - 0.5 * right_sum
   def TakeStep(self, samples, truth, first_index, second_index):
     if first_index == second_index:
@@ -176,7 +176,7 @@ class SVM(object):
     k12 = GaussianKernel(sample1,sample2, covariance)
     k22 = GaussianKernel(sample2,sample2, covariance)
     eta = k11 + k22 - 2 * k12
-    if eta > 0: 
+    if eta < 0: 
       a2 = alpha2 + truth2 * (error1-error2)/eta
       if a2 < L:
         a2 = L
@@ -186,8 +186,10 @@ class SVM(object):
       temp_alphas = self.alphas
       self.alphas[second_index] = L
       Lobj = self.EvaluateObjFunc(second_index, samples, truth)
+      print Lobj
       self.alphas[second_index] = H
-      Hobj = self.EvaluateObjFunc(second_index, samples, truth
+      Hobj = self.EvaluateObjFunc(second_index, samples, truth)
+      print Hobj
       self.alphas = temp_alphas
       if Lobj < Hobj + np.finfo(np.float).eps:
         a2 = L
@@ -196,12 +198,12 @@ class SVM(object):
       else:
         a2 = alpha2
 
+    # print a2, alpha2
     if np.abs(a2-alpha2) < np.finfo(np.float).eps * (a2 + alpha2 + np.finfo(np.float).eps):
       return False
     a1 = alpha1 + s * (alpha2 - a2)
     self.alphas[first_index] = a1
     self.alphas[second_index] = a2
-    print a1
     return True
     # Update threshold to reflect change in Lagrange multipliers
     # Update weight vector to reflect change in a1 & a2, if SVM is linear
@@ -365,7 +367,7 @@ def main():
   #sampleData.plot_sparse()
   #perform the classification
   start = time.time()
-  svm = SVM(1000)
+  svm = SVM(100)
   svm.Train(train_samples, train_sample_data.GetTruth())
   # pudb.set_trace()
   train_classification = svm.Classify(train_samples)
