@@ -56,39 +56,6 @@ class Classifier(object):
     return (samples, truth)
 
 ################################################################################
-################################################################################
-class Regression(Classifier):
-  def __init__(self, class_a, class_b):
-    self.a = []
-    self.c_a = class_a
-    self.c_b = class_b
-
-  def Train(self, samples, truth):
-    samples = np.matrix(samples)
-    truth = np.matrix(truth * 2 - 1)
-    try:
-      self.a = la.inv(samples.T * samples) * samples.T * truth
-    except la.linalg.LinAlgError:
-      self.a = la.inv(samples.T * samples + np.eye(samples.shape[1]) * 0.0000001) * samples.T * truth
-
-  def Classify(self, samples):
-    samples = np.matrix(samples)
-    projection = samples * self.a
-    result = np.zeros(projection.shape)
-
-    result[projection < 0] = self.c_a
-    result[projection >=0] = self.c_b
-
-    return result
-
-  def ReformatData(self, samples, truth):
-    ref_samples = np.ones((samples.shape[0], samples.shape[1]+1))
-    ref_samples[:, 1:] = np.matrix(samples)
-
-    ref_truth = np.matrix(truth)
-    return (np.asmatrix(ref_samples), ref_truth)
-
-################################################################################
 # SVM Utilities
 ################################################################################
 
@@ -100,6 +67,7 @@ def MeetsKKTConditions(C, alpha, sample, truth, output):
   if alpha == C and (truth * output > 1):
     return False
   return True
+
 def GaussianKernel(query, samples, cov):
   query = np.asmatrix(query)
   samples = np.asmatrix(samples)
@@ -138,7 +106,10 @@ class SVM(object):
     the_sum = 0
     truth_class = truth_class.T[0]
     #pudb.set_trace()
-    return np.sign(self.alphas*truth_class*GaussianKernel(query,samples, variance))
+    result = np.sign(self.alphas*truth_class*GaussianKernel(query,samples, variance))
+    if result == 0:
+      result = 1
+    return result
     #return np.sign(self.alphas[i]*truth_class[i]*GaussianKernel(query,samples[i], variance))
   def EvaluateObjFunc(self, sample_index, samples, truth):
     alpha_sum = 0
@@ -158,10 +129,9 @@ class SVM(object):
     truth2 = truth[second_index]
     sample1 = samples[first_index]
     sample2 = samples[second_index]
-    error1 = self.Evaluate(sample1, samples, truth)
-    error2 = self.Evaluate(sample2, samples, truth)
+    error1 = self.Evaluate(sample1, samples, truth) - truth1
+    error2 = self.Evaluate(sample2, samples, truth) - truth2
     s = truth1 * truth2
-    #pudb.set_trace()
     if truth1 != truth2:
       L = max(0, alpha2 - alpha1)
       H = min(self.C, self.C + alpha2 - alpha1)
@@ -174,9 +144,9 @@ class SVM(object):
     k11 = GaussianKernel(sample1,sample1, covariance)
     k12 = GaussianKernel(sample1,sample2, covariance)
     k22 = GaussianKernel(sample2,sample2, covariance)
-    eta = k11 + k22 - 2 * k12
-    if eta > 0: 
-      a2 = alpha2 + truth2 * (error1-error2)/eta
+    eta = 2 * k12 - k11 - k22
+    if eta < 0:
+      a2 = float(alpha2) - float(truth2) * float(error1-error2)/eta
       if a2 < L:
         a2 = L
       elif a2 > H:
@@ -213,14 +183,12 @@ class SVM(object):
       if self.TakeStep(samples, truth, second_index, sample_index):
         return 1
     for second_sample_index, alpha in enumerate(self.alphas):
-      #print("In second loop")
       if second_sample_index != sample_index and alpha > 0 and alpha < self.C:
         if self.TakeStep(samples, truth, sample_index, second_sample_index):
           return 1
     num_samples = samples.shape[0]
     start_point = int(np.floor(random.random() * num_samples - 1))
     for i in range(start_point, start_point + num_samples):
-      #print("In third loop")
       second_sample_index = i % num_samples
       if second_sample_index != sample_index and self.TakeStep(samples, truth, sample_index, second_sample_index):
         return 1
@@ -237,19 +205,15 @@ class SVM(object):
     while num_alphas_changed > 0 or inspect_all:
       #iterations += 1
       #if iterations % 1 == 0:
-        #print("Iteration: "+str(iterations))
       num_alphas_changed = 0
       #loop over all the points which don't satisfy the Karush-Kahn-Tucker conditions
-      #print("0000/0000")
       for index,alpha in enumerate(self.alphas):
-        # print(str(index)+"/"+str(self.alphas.shape[0]))
 
         #else this is not the first iteration and at least one alpha was changed on the last iteration
         sample = samples[index]
         sample_truth = truth[index]
         output = self.Evaluate(sample, samples, truth)
-        if inspect_all or not MeetsKKTConditions(self.C, alpha, sample, sample_truth, output,):
-          
+        if inspect_all or (alpha < self.C or alpha > 0):
           num_alphas_changed += self.OptimizePoint(samples, truth, index)
       if inspect_all:
         inspect_all = False
@@ -285,6 +249,7 @@ class TwoDGaussian(object):
       return self.sign * self.normalizer * np.exp(- 0.5 * dist)
 ################################################################################
 ################################################################################
+fig_num = 0
 class DatasetGenerator(object):
   def __init__(self, gaussians, samples):
     '''gaussians=list of 2dGaussians
@@ -296,20 +261,29 @@ class DatasetGenerator(object):
   def getDistances(self):
     return self.distances
   def plot_grid(self):
+    global fig_num
     #Get the image data and reformat it for matplotlib to graph
     image = self.distances
     image = np.reshape(image,[np.sqrt(image.shape[0]),np.sqrt(image.shape[0])])
     image[image > 0] = 1
     image[image < 0] = 0
-    plt.figure(2)
+    plt.figure(fig_num)
+    fig_num += 1
     plt.imshow(image,interpolation='none',cmap='Greys_r')
     plt.show(block=False)
-  def plot_sparse(self):
+  def plot_sparse(self, distances = -1):
+    global fig_num
+    try:
+      if distances == -1:
+        distances = self.distances
+    except ValueError:
+      pass
     #plot each point on a plane
-    plt.figure(3)
-    posClass = self.samples[(self.distances > 0).view(np.ndarray).ravel()==1]
+    plt.figure(fig_num)
+    fig_num += 1
+    posClass = self.samples[(distances > 0).view(np.ndarray).ravel()==1]
     plt.plot(posClass[:,0],-posClass[:,1],'ro')
-    negClass = self.samples[(self.distances <=0).view(np.ndarray).ravel()==1]
+    negClass = self.samples[(distances <=0).view(np.ndarray).ravel()==1]
     plt.plot(negClass[:,0],-negClass[:,1],'bo')
     plt.show(block=False)
   def GetTruth(self):
@@ -353,9 +327,9 @@ def main():
     gaussians.append(TwoDGaussian(rightX[i],rightY[i],0.1,-1))
   #This function compute the weight of each point in meshgrid. For a discrete grid this is equivalent to building an image of the gaussian field
   gridData = DatasetGenerator(gaussians,grid)
-  #gridData.plot_grid()
+  gridData.plot_grid()
   #generate the actual dataset to classify on
-  num_training_samples = 25
+  num_training_samples = 100
   train_samples = np.random.rand(num_training_samples,2)
   train_sample_data = DatasetGenerator(gaussians,train_samples)
   train_samples = np.concatenate((train_samples, np.ones((train_samples.shape[0], 1))), axis=1)
@@ -363,18 +337,18 @@ def main():
   num_test_samples = 100
   test_samples = np.random.rand(num_test_samples,2)
   test_sample_data = DatasetGenerator(gaussians,test_samples)
-  #sampleData.plot_sparse()
+  train_sample_data.plot_sparse()
   #perform the classification
   start = time.time()
   svm = SVM(100)
   svm.Train(train_samples, train_sample_data.GetTruth())
-  # pudb.set_trace()
   train_classification = svm.Classify(train_samples)
   diff = train_classification - np.array(train_sample_data.GetTruth().T[0])
   num_errors = np.sum(diff!=0)
   print('Num errors: '+str(num_errors)+' '+str(float(num_errors)/num_training_samples))
-  #pudb.set_trace()
   print time.time()-start
+  #plot the classification results
+  train_sample_data.plot_sparse(train_classification)
   plt.show()
   print svm.alphas
   
