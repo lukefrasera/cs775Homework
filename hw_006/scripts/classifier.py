@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+import time
 import numpy as np
 from numpy import linalg as la
 import numexpr as ne
@@ -201,14 +201,14 @@ class SVM(object):
       if self.TakeStep(samples, truth, sample_index, second_index):
         return 1
     for second_sample_index, alpha in enumerate(self.alphas):
-      print("In second loop")
+      #print("In second loop")
       if second_sample_index != sample_index and alpha > 0 and alpha < self.C:
         if self.TakeStep(samples, truth, sample_index, second_sample_index):
           return 1
     num_samples = samples.shape[0]
     start_point = int(np.floor(random.random() * num_samples - 1))
     for i in range(start_point, start_point + num_samples):
-      print("In third loop")
+      #print("In third loop")
       second_sample_index = i % num_samples
       if second_sample_index != sample_index and self.TakeStep(samples, truth, sample_index, second_sample_index):
         return 1
@@ -221,17 +221,17 @@ class SVM(object):
     #loop through all the alpha weights
     num_alphas_changed = 0
     inspect_all = True
-    iterations = 0
+    #iterations = 0
     while num_alphas_changed > 0 or inspect_all:
-      iterations += 1
-      if iterations % 1 == 0:
-        print("Iteration: "+str(iterations))
+      #iterations += 1
+      #if iterations % 1 == 0:
+        #print("Iteration: "+str(iterations))
       num_alphas_changed = 0
       #loop over all the points which don't satisfy the Karush-Kahn-Tucker conditions
-      print("0000/0000")
+      #print("0000/0000")
       for index,alpha in enumerate(self.alphas):
-        print(str(index)+"/"+str(self.alphas.shape[0]))
-        # if inspect_all==True this is either the first iteration or we are verifying that we are done, so process every alpha
+        # print(str(index)+"/"+str(self.alphas.shape[0]))
+
         #else this is not the first iteration and at least one alpha was changed on the last iteration
         sample = samples[index]
         sample_truth = truth[index]
@@ -312,6 +312,7 @@ class DatasetGenerator(object):
 def main():
   ''' Test the classes for performance and corrrecness'''
   #Generate a number of points in 2D, these will be the gaussian centers
+  np.random.seed(1)
   gaussians = []
   num_gaussians = 6
   parent_variance = 0.2
@@ -342,21 +343,23 @@ def main():
   gridData = DatasetGenerator(gaussians,grid)
   #gridData.plot_grid()
   #generate the actual dataset to classify on
-  num_training_samples = 50
+  num_training_samples = 25
   train_samples = np.random.rand(num_training_samples,2)
   train_sample_data = DatasetGenerator(gaussians,train_samples)
-  num_test_samples = 1000
+  num_test_samples = 100
   test_samples = np.random.rand(num_test_samples,2)
   test_sample_data = DatasetGenerator(gaussians,test_samples)
   #sampleData.plot_sparse()
   #perform the classification
-  svm = SVM(2)
+  start = time.time()
+  svm = SVM(1000)
   svm.Train(train_samples, train_sample_data.GetTruth())
-  test_classification = svm.Classify(test_samples)
-  diff = test_classification - np.array(test_sample_data.GetTruth().T[0])
+  train_classification = svm.Classify(train_samples)
+  diff = train_classification - np.array(train_sample_data.GetTruth().T[0])
   num_errors = np.sum(diff!=0)
-  print('Num errors: '+str(num_errors)+' '+str(float(num_errors)/num_test_samples))
+  print('Num errors: '+str(num_errors)+' '+str(float(num_errors)/num_training_samples))
   #pudb.set_trace()
+  print time.time()-start
   plt.show()
   
 if __name__ == '__main__':
