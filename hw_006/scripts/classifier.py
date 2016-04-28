@@ -56,39 +56,6 @@ class Classifier(object):
     return (samples, truth)
 
 ################################################################################
-################################################################################
-class Regression(Classifier):
-  def __init__(self, class_a, class_b):
-    self.a = []
-    self.c_a = class_a
-    self.c_b = class_b
-
-  def Train(self, samples, truth):
-    samples = np.matrix(samples)
-    truth = np.matrix(truth * 2 - 1)
-    try:
-      self.a = la.inv(samples.T * samples) * samples.T * truth
-    except la.linalg.LinAlgError:
-      self.a = la.inv(samples.T * samples + np.eye(samples.shape[1]) * 0.0000001) * samples.T * truth
-
-  def Classify(self, samples):
-    samples = np.matrix(samples)
-    projection = samples * self.a
-    result = np.zeros(projection.shape)
-
-    result[projection < 0] = self.c_a
-    result[projection >=0] = self.c_b
-
-    return result
-
-  def ReformatData(self, samples, truth):
-    ref_samples = np.ones((samples.shape[0], samples.shape[1]+1))
-    ref_samples[:, 1:] = np.matrix(samples)
-
-    ref_truth = np.matrix(truth)
-    return (np.asmatrix(ref_samples), ref_truth)
-
-################################################################################
 # SVM Utilities
 ################################################################################
 
@@ -100,6 +67,7 @@ def MeetsKKTConditions(C, alpha, sample, truth, output):
   if alpha == C and (truth * output > 1):
     return False
   return True
+
 def GaussianKernel(query, samples, cov):
   query = np.asmatrix(query)
   samples = np.asmatrix(samples)
@@ -175,8 +143,9 @@ class SVM(object):
     k12 = GaussianKernel(sample1,sample2, covariance)
     k22 = GaussianKernel(sample2,sample2, covariance)
     eta = k11 + k22 - 2 * k12
-    if eta >= 0: 
-      a2 = alpha2 + truth2 * (error1-error2)/eta
+    print(eta)
+    if eta < 0: 
+      a2 = alpha2 - truth2 * (error1-error2)/eta
       if a2 < L:
         a2 = L
       elif a2 > H:
@@ -199,6 +168,7 @@ class SVM(object):
     elif a2 > self.C-1e-8:
       a2 = self.C
     if np.abs(a2-alpha2) < np.finfo(np.float).eps * (a2 + alpha2 + np.finfo(np.float).eps):
+      #print("Failed EPS test")
       return False
     a1 = alpha1 + s * (alpha2 - a2)
     self.alphas[first_index] = a1
@@ -248,8 +218,7 @@ class SVM(object):
         sample = samples[index]
         sample_truth = truth[index]
         output = self.Evaluate(sample, samples, truth)
-        if inspect_all or not MeetsKKTConditions(self.C, alpha, sample, sample_truth, output,):
-          
+        if inspect_all or (alpha < self.C or alpha > 0):
           num_alphas_changed += self.OptimizePoint(samples, truth, index)
       if inspect_all:
         inspect_all = False
