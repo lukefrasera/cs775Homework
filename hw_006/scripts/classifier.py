@@ -106,7 +106,10 @@ class SVM(object):
     the_sum = 0
     truth_class = truth_class.T[0]
     #pudb.set_trace()
-    return np.sign(self.alphas*truth_class*GaussianKernel(query,samples, variance))
+    result = np.sign(self.alphas*truth_class*GaussianKernel(query,samples, variance))
+    if result == 0:
+      result = 1
+    return result
     #return np.sign(self.alphas[i]*truth_class[i]*GaussianKernel(query,samples[i], variance))
   def EvaluateObjFunc(self, sample_index, samples, truth):
     alpha_sum = 0
@@ -126,10 +129,9 @@ class SVM(object):
     truth2 = truth[second_index]
     sample1 = samples[first_index]
     sample2 = samples[second_index]
-    error1 = self.Evaluate(sample1, samples, truth)
-    error2 = self.Evaluate(sample2, samples, truth)
+    error1 = self.Evaluate(sample1, samples, truth) - truth1
+    error2 = self.Evaluate(sample2, samples, truth) - truth2
     s = truth1 * truth2
-    #pudb.set_trace()
     if truth1 != truth2:
       L = max(0, alpha2 - alpha1)
       H = min(self.C, self.C + alpha2 - alpha1)
@@ -142,10 +144,9 @@ class SVM(object):
     k11 = GaussianKernel(sample1,sample1, covariance)
     k12 = GaussianKernel(sample1,sample2, covariance)
     k22 = GaussianKernel(sample2,sample2, covariance)
-    eta = k11 + k22 - 2 * k12
-    print(eta)
-    if eta < 0: 
-      a2 = alpha2 - truth2 * (error1-error2)/eta
+    eta = 2 * k12 - k11 - k22
+    if eta < 0:
+      a2 = float(alpha2) - float(truth2) * float(error1-error2)/eta
       if a2 < L:
         a2 = L
       elif a2 > H:
@@ -168,7 +169,6 @@ class SVM(object):
     elif a2 > self.C-1e-8:
       a2 = self.C
     if np.abs(a2-alpha2) < np.finfo(np.float).eps * (a2 + alpha2 + np.finfo(np.float).eps):
-      #print("Failed EPS test")
       return False
     a1 = alpha1 + s * (alpha2 - a2)
     self.alphas[first_index] = a1
@@ -183,14 +183,12 @@ class SVM(object):
       if self.TakeStep(samples, truth, second_index, sample_index):
         return 1
     for second_sample_index, alpha in enumerate(self.alphas):
-      #print("In second loop")
       if second_sample_index != sample_index and alpha > 0 and alpha < self.C:
         if self.TakeStep(samples, truth, sample_index, second_sample_index):
           return 1
     num_samples = samples.shape[0]
     start_point = int(np.floor(random.random() * num_samples - 1))
     for i in range(start_point, start_point + num_samples):
-      #print("In third loop")
       second_sample_index = i % num_samples
       if second_sample_index != sample_index and self.TakeStep(samples, truth, sample_index, second_sample_index):
         return 1
@@ -207,12 +205,9 @@ class SVM(object):
     while num_alphas_changed > 0 or inspect_all:
       #iterations += 1
       #if iterations % 1 == 0:
-        #print("Iteration: "+str(iterations))
       num_alphas_changed = 0
       #loop over all the points which don't satisfy the Karush-Kahn-Tucker conditions
-      #print("0000/0000")
       for index,alpha in enumerate(self.alphas):
-        # print(str(index)+"/"+str(self.alphas.shape[0]))
 
         #else this is not the first iteration and at least one alpha was changed on the last iteration
         sample = samples[index]
@@ -337,12 +332,10 @@ def main():
   start = time.time()
   svm = SVM(100)
   svm.Train(train_samples, train_sample_data.GetTruth())
-  # pudb.set_trace()
   train_classification = svm.Classify(train_samples)
   diff = train_classification - np.array(train_sample_data.GetTruth().T[0])
   num_errors = np.sum(diff!=0)
   print('Num errors: '+str(num_errors)+' '+str(float(num_errors)/num_training_samples))
-  #pudb.set_trace()
   print time.time()-start
   plt.show()
   print svm.alphas
